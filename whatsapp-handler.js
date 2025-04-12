@@ -5,6 +5,90 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
+// Fungsi untuk mengirim notifikasi ke pelanggan
+async function sendNotificationToCustomer(customerNumber, message, settings) {
+    try {
+        if (!customerNumber || !message) {
+            console.error('Nomor pelanggan atau pesan tidak valid');
+            return false;
+        }
+        
+        console.log(`Mengirim notifikasi ke pelanggan ${customerNumber}: ${message}`);
+        
+        // Baca file settings.json jika settings tidak diberikan
+        if (!settings) {
+            try {
+                const settingsFile = path.join(process.cwd(), 'settings.json');
+                settings = JSON.parse(fs.readFileSync(settingsFile));
+            } catch (err) {
+                console.error('Error membaca settings.json:', err);
+                settings = {};
+            }
+        }
+        
+        // Dapatkan pengaturan gateway WhatsApp
+        const gateway = settings?.whatsappGateway || 'mpwa';
+        // Di app.js, API key disimpan sebagai 'token'
+        const apiKey = settings?.gateways?.[gateway]?.token || settings?.gateways?.[gateway]?.apiKey || process.env.MPWA_API_KEY || process.env.MPWA_TOKEN;
+        const serverUrl = settings?.gateways?.[gateway]?.serverUrl || 'https://wa.parabolaku.id/send-message';
+        const sender = settings?.gateways?.[gateway]?.sender || process.env.MPWA_SENDER || '';
+        const footer = settings?.gateways?.[gateway]?.footer || settings?.ispName || 'WebPortal';
+        
+        if (!apiKey) {
+            console.error('API key/token tidak ditemukan dalam pengaturan atau environment variables');
+            return false;
+        }
+        
+        console.log('Pengaturan WhatsApp gateway:', {
+            gateway,
+            serverUrl,
+            sender,
+            apiKeyExists: !!apiKey,
+            footer
+        });
+        
+        // Format nomor pelanggan (pastikan diawali dengan 62)
+        let formattedNumber = customerNumber.toString().trim();
+        
+        // Hapus karakter non-digit
+        formattedNumber = formattedNumber.replace(/\D/g, '');
+        
+        // Format nomor dengan benar
+        if (formattedNumber.startsWith('0')) {
+            formattedNumber = '62' + formattedNumber.substring(1);
+        } else if (!formattedNumber.startsWith('62')) {
+            formattedNumber = '62' + formattedNumber;
+        }
+        
+        console.log(`Nomor yang diformat: ${formattedNumber}`);
+        
+        // Kirim pesan menggunakan gateway yang dikonfigurasi
+        if (gateway === 'mpwa') {
+            // Buat payload sesuai dengan format yang diharapkan oleh API
+            const payload = {
+                api_key: apiKey,
+                sender: sender,
+                number: formattedNumber,
+                message: message,
+                footer: footer
+            };
+            
+            console.log('Mengirim payload ke MPWA:', payload);
+            
+            const response = await axios.post(serverUrl, payload);
+            
+            console.log('Respons dari gateway WhatsApp:', response.data);
+            return response.data?.status === true;
+        } else {
+            console.error('Gateway WhatsApp tidak didukung:', gateway);
+            return false;
+        }
+    } catch (error) {
+        console.error('Error mengirim notifikasi ke pelanggan:', error);
+        return false;
+    }
+}
+
 // Fungsi untuk memformat pesan WhatsApp dengan header dan footer yang menarik
 function formatWhatsAppMessage(title, content, settings) {
     const currentDate = new Date();
@@ -412,7 +496,7 @@ async function getDeviceStatusMessage(deviceId, genieacsUrl, auth, getDeviceStat
 }
 
 // Fungsi untuk update pengaturan WiFi via WhatsApp
-async function updateWifiSettingViaWhatsApp(deviceId, settingType, newValue, genieacsUrl, auth) {
+async function updateWifiSettingViaWhatsApp(deviceId, settingType, newValue, genieacsUrl, auth, isAdminRequest = false, customerNumber = null) {
     try {
         // Validasi input
         if (!deviceId || !settingType || !newValue) {
@@ -420,6 +504,9 @@ async function updateWifiSettingViaWhatsApp(deviceId, settingType, newValue, gen
         }
         
         console.log(`Update WiFi request via WhatsApp: ${settingType}=${newValue} for device ${deviceId}`);
+        if (isAdminRequest && customerNumber) {
+            console.log(`Request dari admin untuk pelanggan: ${customerNumber}`);
+        }
         
         // Siapkan parameter untuk update
         let ssid2G, ssid5G, password2G, password5G;
@@ -527,6 +614,82 @@ async function updateWifiSettingViaWhatsApp(deviceId, settingType, newValue, gen
         } catch (error) {
             console.error('Error reading settings:', error);
             settings = {};
+        }
+        
+        // Jika ini adalah permintaan admin untuk pelanggan, kirim notifikasi ke pelanggan
+        if (isAdminRequest && customerNumber) {
+            try {
+                // Pastikan settings memiliki informasi yang diperlukan
+                if (!settings.gateways || !settings.gateways.mpwa) {
+                    // Coba ambil dari environment variables
+                    settings.gateways = settings.gateways || {};
+                    settings.gateways.mpwa = settings.gateways.mpwa || {};
+                    
+                    // Di app.js, API key disimpan sebagai 'token'
+                    if (!settings.gateways.mpwa.token) {
+                        settings.gateways.mpwa.token = settings.gateways.mpwa.apiKey || process.env.MPWA_API_KEY || process.env.MPWA_TOKEN;
+                    }
+                    
+                    if (!settings.gateways.mpwa.sender) {
+                        settings.gateways.mpwa.sender = process.env.MPWA_SENDER || '';
+                    }
+                    
+                    if (!settings.gateways.mpwa.serverUrl) {
+                        settings.gateways.mpwa.serverUrl = 'https://wa.parabolaku.id/send-message';
+                    }
+                    
+                    if (!settings.gateways.mpwa.footer) {
+                        settings.gateways.mpwa.footer = settings.ispName || 'WebPortal';
+                    }
+                }
+                
+                // Log pengaturan untuk debug
+                console.log('Pengaturan WhatsApp untuk notifikasi:', {
+                    tokenExists: !!settings.gateways.mpwa.token,
+                    sender: settings.gateways.mpwa.sender,
+                    serverUrl: settings.gateways.mpwa.serverUrl,
+                    footer: settings.gateways.mpwa.footer
+                });
+                
+                // Buat pesan notifikasi
+                let notificationTitle = "Perubahan Pengaturan WiFi";
+                let notificationContent = `${paramName} perangkat Anda telah diubah oleh administrator.\n\n`;
+                
+                // Tambahkan detail perubahan
+                if (ssid2G) {
+                    notificationContent += `SSID 2.4G baru: *${ssid2G}*\n`;
+                }
+                if (ssid5G) {
+                    notificationContent += `SSID 5G baru: *${ssid5G}*\n`;
+                }
+                if (password2G) {
+                    notificationContent += `Password WiFi 2.4G baru: *${password2G}*\n`;
+                }
+                if (password5G) {
+                    notificationContent += `Password WiFi 5G baru: *${password5G}*\n`;
+                }
+                
+                // Format pesan dengan header dan footer
+                const formattedMessage = formatWhatsAppMessage(notificationTitle, notificationContent, settings);
+                
+                // Kirim notifikasi ke pelanggan
+                console.log(`Mengirim notifikasi perubahan ${paramName} ke pelanggan ${customerNumber}`);
+                
+                // Pastikan nomor pelanggan valid
+                if (customerNumber && customerNumber.length >= 5) {
+                    const success = await sendNotificationToCustomer(customerNumber, formattedMessage, settings);
+                    if (success) {
+                        console.log(`Notifikasi berhasil dikirim ke pelanggan ${customerNumber}`);
+                    } else {
+                        console.error(`Gagal mengirim notifikasi ke pelanggan ${customerNumber}`);
+                    }
+                } else {
+                    console.error(`Nomor pelanggan tidak valid: ${customerNumber}`);
+                }
+            } catch (notifError) {
+                console.error('Error mengirim notifikasi ke pelanggan:', notifError);
+                // Lanjutkan meskipun ada error saat mengirim notifikasi
+            }
         }
         
         return WHATSAPP_MESSAGES.SUCCESS(paramName, newValue, settings);
@@ -1031,7 +1194,7 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
                 const customerDeviceId = await getDeviceIdByWhatsApp(customerNumber, formatWhatsAppNumber);
                 if (customerDeviceId) {
                     deviceId = customerDeviceId;
-                    return await updateWifiSettingViaWhatsApp(deviceId, 'ssid2G', newSsid, genieacsUrl, auth);
+                    return await updateWifiSettingViaWhatsApp(deviceId, 'ssid2G', newSsid, genieacsUrl, auth, true, customerNumber);
                 } else {
                     return WHATSAPP_MESSAGES.getFormattedMessage('Pelanggan Tidak Ditemukan', `Pelanggan dengan nomor ${customerNumber} tidak ditemukan.`, settings);
                 }
@@ -1060,7 +1223,7 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
                 const customerDeviceId = await getDeviceIdByWhatsApp(customerNumber, formatWhatsAppNumber);
                 if (customerDeviceId) {
                     deviceId = customerDeviceId;
-                    return await updateWifiSettingViaWhatsApp(deviceId, 'ssid5G', newSsid, genieacsUrl, auth);
+                    return await updateWifiSettingViaWhatsApp(deviceId, 'ssid5G', newSsid, genieacsUrl, auth, true, customerNumber);
                 } else {
                     return WHATSAPP_MESSAGES.getFormattedMessage('Pelanggan Tidak Ditemukan', `Pelanggan dengan nomor ${customerNumber} tidak ditemukan.`, settings);
                 }
@@ -1089,7 +1252,7 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
                 const customerDeviceId = await getDeviceIdByWhatsApp(customerNumber, formatWhatsAppNumber);
                 if (customerDeviceId) {
                     deviceId = customerDeviceId;
-                    return await updateWifiSettingViaWhatsApp(deviceId, 'password2G', newPassword, genieacsUrl, auth);
+                    return await updateWifiSettingViaWhatsApp(deviceId, 'password2G', newPassword, genieacsUrl, auth, true, customerNumber);
                 } else {
                     return WHATSAPP_MESSAGES.getFormattedMessage('Pelanggan Tidak Ditemukan', `Pelanggan dengan nomor ${customerNumber} tidak ditemukan.`, settings);
                 }
@@ -1118,7 +1281,7 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
                 const customerDeviceId = await getDeviceIdByWhatsApp(customerNumber, formatWhatsAppNumber);
                 if (customerDeviceId) {
                     deviceId = customerDeviceId;
-                    return await updateWifiSettingViaWhatsApp(deviceId, 'password5G', newPassword, genieacsUrl, auth);
+                    return await updateWifiSettingViaWhatsApp(deviceId, 'password5G', newPassword, genieacsUrl, auth, true, customerNumber);
                 } else {
                     return WHATSAPP_MESSAGES.getFormattedMessage('Pelanggan Tidak Ditemukan', `Pelanggan dengan nomor ${customerNumber} tidak ditemukan.`, settings);
                 }
@@ -1237,5 +1400,6 @@ module.exports = {
     getConnectedDevicesMessage,
     getUserInfoMessage,
     getDeviceListMessage,
+    sendNotificationToCustomer,
     processWhatsAppMessage
 };
