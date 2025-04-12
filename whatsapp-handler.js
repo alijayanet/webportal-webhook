@@ -53,13 +53,14 @@ function formatWhatsAppMessage(title, content, settings) {
 const WHATSAPP_COMMANDS = {
     HELP: ['help', 'bantuan', 'menu'],
     STATUS: ['status', 'cek', 'info'],
-    SSID_2G: ['ssid2g', 'wifi2g', 'ssid 2g'],
-    SSID_5G: ['ssid5g', 'wifi5g', 'ssid 5g'],
-    PASSWORD_2G: ['pass2g', 'password2g', 'pw2g'],
-    PASSWORD_5G: ['pass5g', 'password5g', 'pw5g'],
     REBOOT: ['reboot', 'restart', 'boot'],
+    SSID_2G: ['ssid2g', 'ssid2'],
+    SSID_5G: ['ssid5g', 'ssid5'],
+    PASSWORD_2G: ['pass2g', 'password2g', 'pwd2g'],
+    PASSWORD_5G: ['pass5g', 'password5g', 'pwd5g'],
     USER_INFO: ['userinfo', 'user', 'pelanggan'],
-    CONNECTED_DEVICES: ['devices', 'perangkat', 'connected']
+    CONNECTED_DEVICES: ['devices', 'perangkat', 'connected'],
+    LIST_DEVICES: ['listdevices', 'daftarperangkat', 'listnomor']
 };
 
 // Konstanta untuk pesan WhatsApp
@@ -92,7 +93,8 @@ const WHATSAPP_MESSAGES = {
         content += "🔸 *ssid2g* [no_pelanggan] [nama] - Ubah SSID 2.4G pelanggan\n";
         content += "🔸 *ssid5g* [no_pelanggan] [nama] - Ubah SSID 5G pelanggan\n";
         content += "🔸 *pass2g* [no_pelanggan] [password] - Ubah password WiFi 2.4G pelanggan\n";
-        content += "🔸 *pass5g* [no_pelanggan] [password] - Ubah password WiFi 5G pelanggan";
+        content += "🔸 *pass5g* [no_pelanggan] [password] - Ubah password WiFi 5G pelanggan\n";
+        content += "🔸 *listdevices* - Lihat daftar semua perangkat dan nomor pelanggan";
         
         return formatWhatsAppMessage("Menu Bantuan", content, settings);
     },
@@ -139,6 +141,7 @@ async function getDeviceIdByWhatsApp(whatsappNumber, formatWhatsAppNumber) {
     try {
         // Format nomor WhatsApp untuk pencarian
         const formattedNumber = formatWhatsAppNumber(whatsappNumber);
+        console.log(`Mencari perangkat untuk nomor WhatsApp: ${whatsappNumber}, format: ${formattedNumber}`);
         
         // Coba ambil dari GenieACS
         const genieacsUrl = process.env.GENIEACS_URL;
@@ -150,17 +153,100 @@ async function getDeviceIdByWhatsApp(whatsappNumber, formatWhatsAppNumber) {
             password: genieacsPassword
         };
         
-        // Query untuk mencari perangkat berdasarkan nomor WhatsApp
-        const query = encodeURIComponent(JSON.stringify({
-            "_tags.customerNumber": formattedNumber
-        }));
+        // Buat beberapa kemungkinan format nomor untuk pencarian
+        const possibleFormats = [
+            formattedNumber,                // Format 62xxx
+            formattedNumber.replace(/^62/, '0'), // Format 0xxx
+            formattedNumber.replace(/^62/, '')   // Format tanpa awalan
+        ];
         
-        const response = await axios.get(`${genieacsUrl}/devices?query=${query}`, { auth });
+        console.log('Mencoba format nomor:', possibleFormats);
         
-        if (response.data && response.data.length > 0) {
-            return response.data[0]._id;
+        // Menggunakan pendekatan yang sama seperti di web portal
+        console.log('Mengambil semua perangkat dari GenieACS...');
+        const response = await axios.get(`${genieacsUrl}/devices`, {
+            auth: auth,
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+        
+        console.log(`Total perangkat: ${response.data.length}`);
+        
+        // Cari perangkat dengan tag yang cocok (pendekatan yang sama seperti di web portal)
+        for (const format of possibleFormats) {
+            console.log(`Mencari perangkat dengan tag: ${format}`);
+            
+            // Cari perangkat yang memiliki tag yang cocok dengan nomor pelanggan
+            const device = response.data.find(d => {
+                if (!d._tags) return false;
+                
+                // Debug: log tag perangkat
+                console.log(`Perangkat ${d._id} memiliki tags:`, d._tags);
+                
+                // Cek jika tag adalah array (format lama)
+                if (Array.isArray(d._tags)) {
+                    return d._tags.includes(format);
+                }
+                
+                // Cek jika tag adalah object (format baru)
+                if (typeof d._tags === 'object') {
+                    // Cek jika ada tag customerNumber yang cocok
+                    if (d._tags.customerNumber === format) {
+                        return true;
+                    }
+                    
+                    // Cek jika ada tag yang merupakan nomor pelanggan
+                    // Hanya cocokkan jika tag adalah nomor telepon (minimal 5 digit)
+                    for (const tag in d._tags) {
+                        if (tag.length >= 5 && /^\d+$/.test(tag) && tag === format) {
+                            return true;
+                        }
+                    }
+                }
+                
+                return false;
+            });
+            
+            if (device) {
+                console.log(`Perangkat ditemukan dengan tag ${format}:`, device._id);
+                return device._id;
+            }
         }
         
+        // Jika tidak ditemukan dengan exact match, coba dengan partial match
+        console.log('Mencoba dengan partial match...');
+        for (const format of possibleFormats) {
+            const device = response.data.find(d => {
+                if (!d._tags) return false;
+                
+                // Cek jika tag adalah object (format baru)
+                if (typeof d._tags === 'object') {
+                    // Cek jika ada tag customerNumber yang cocok dengan partial match
+                    if (d._tags.customerNumber && 
+                       (d._tags.customerNumber.endsWith(format) || format.endsWith(d._tags.customerNumber))) {
+                        return true;
+                    }
+                    
+                    // Cek jika ada tag yang merupakan nomor pelanggan dengan partial match
+                    for (const tag in d._tags) {
+                        if (tag.length >= 5 && /^\d+$/.test(tag) && 
+                           (tag.endsWith(format) || format.endsWith(tag))) {
+                            return true;
+                        }
+                    }
+                }
+                
+                return false;
+            });
+            
+            if (device) {
+                console.log(`Perangkat ditemukan dengan partial match ${format}:`, device._id);
+                return device._id;
+            }
+        }
+        
+        console.log('Perangkat tidak ditemukan untuk nomor:', whatsappNumber);
         return null;
     } catch (error) {
         console.error('Error getting deviceId by WhatsApp number:', error);
@@ -185,24 +271,57 @@ function isAdminWhatsApp(whatsappNumber, formatWhatsAppNumber, settingsFile) {
 // Fungsi untuk mendapatkan status perangkat dalam format pesan
 async function getDeviceStatusMessage(deviceId, genieacsUrl, auth, getDeviceStatus, formatUptime, getParameterWithPaths, parameterPaths) {
     try {
-        // Ambil data perangkat dari GenieACS
-        const response = await axios.get(`${genieacsUrl}/devices/${encodeURIComponent(deviceId)}`, { auth });
+        // Ambil data perangkat dari GenieACS menggunakan query alih-alih akses langsung
+        // Ini menghindari error 405 Method Not Allowed
+        const query = encodeURIComponent(JSON.stringify({"_id": deviceId}));
+        console.log(`Mencari perangkat dengan query: ${query}`);
+        const response = await axios.get(`${genieacsUrl}/devices/?query=${query}`, { auth });
         
-        if (!response.data) {
+        // Endpoint query mengembalikan array, bukan objek tunggal
+        if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
+            console.log('Perangkat tidak ditemukan dalam respons query');
             return "Perangkat tidak ditemukan.";
         }
         
-        const device = response.data;
+        // Ambil perangkat pertama dari hasil query
+        const device = response.data[0];
+        console.log(`Perangkat ditemukan: ${device._id}`);
+        console.log('Raw device data:', JSON.stringify(device, null, 2));
         
-        // Ambil informasi status
-        const lastInform = new Date(device.lastInform?._value || 0);
+        // Ambil informasi status - perbaikan cara mendapatkan lastInform
+        // Cek apakah _lastInform ada langsung di objek device (seperti di web portal)
+        const lastInform = device._lastInform || device.lastInform?._value || 0;
+        console.log(`Last Inform: ${lastInform}, type: ${typeof lastInform}`);
+        
+        // Gunakan fungsi getDeviceStatus yang sama dengan web portal
         const status = getDeviceStatus(lastInform);
+        console.log(`Status perangkat: ${status ? 'Online' : 'Offline'}`);
         
         // Ambil parameter perangkat menggunakan parameterPaths dari app.js
         const serialNumber = getParameterWithPaths(device, parameterPaths.serialNumber) || 'N/A';
         const model = getParameterWithPaths(device, parameterPaths.productClass) || 'N/A';
         const uptime = getParameterWithPaths(device, parameterPaths.uptime);
-        const formattedUptime = uptime ? formatUptime(uptime) : 'N/A';
+        
+        // Periksa jika uptime sudah dalam format string (1d 04:26:59) atau angka (seconds)
+        let formattedUptime;
+        if (uptime) {
+            if (typeof uptime === 'string' && uptime.includes('d') && uptime.includes(':')) {
+                // Uptime sudah dalam format string, gunakan langsung
+                formattedUptime = uptime;
+                console.log(`Menggunakan format uptime yang sudah ada: ${uptime}`);
+            } else if (!isNaN(uptime)) {
+                // Uptime dalam format angka (detik), konversi menggunakan formatUptime
+                formattedUptime = formatUptime(uptime);
+                console.log(`Mengkonversi uptime dari detik: ${uptime} -> ${formattedUptime}`);
+            } else {
+                // Format tidak dikenali
+                formattedUptime = 'N/A';
+                console.log(`Format uptime tidak dikenali: ${uptime}`);
+            }
+        } else {
+            formattedUptime = 'N/A';
+        }
+        
         const ssid2G = getParameterWithPaths(device, parameterPaths.ssid2G) || 'N/A';
         const ssid5G = getParameterWithPaths(device, parameterPaths.ssid5G) || 'N/A';
         const rxPower = getParameterWithPaths(device, parameterPaths.rxPower);
@@ -212,10 +331,46 @@ async function getDeviceStatusMessage(deviceId, genieacsUrl, auth, getDeviceStat
         const userConnected2G = getParameterWithPaths(device, parameterPaths.userConnected2G) || '0';
         const userConnected5G = getParameterWithPaths(device, parameterPaths.userConnected5G) || '0';
         
+        // Dapatkan nomor pelanggan dari tags - menggunakan pendekatan yang sama dengan web portal
+        let customerNumber = 'N/A';
+        if (device._tags) {
+            console.log('Device tags:', device._tags);
+            
+            // Pendekatan 1: Cek jika tags adalah array (format lama)
+            if (Array.isArray(device._tags)) {
+                // Cari tag yang merupakan nomor telepon
+                for (const tag of device._tags) {
+                    if (tag && tag.length >= 5 && /^\d+$/.test(tag)) {
+                        customerNumber = tag;
+                        console.log(`Nomor pelanggan ditemukan dari array tags: ${customerNumber}`);
+                        break;
+                    }
+                }
+            } 
+            // Pendekatan 2: Cek jika tags adalah object (format baru)
+            else if (typeof device._tags === 'object') {
+                // Cek jika ada tag customerNumber
+                if (device._tags.customerNumber) {
+                    customerNumber = device._tags.customerNumber;
+                    console.log(`Nomor pelanggan ditemukan dari tag customerNumber: ${customerNumber}`);
+                } else {
+                    // Cek jika ada tag yang merupakan nomor telepon (minimal 5 digit)
+                    for (const tag in device._tags) {
+                        if (tag.length >= 5 && /^\d+$/.test(tag)) {
+                            customerNumber = tag;
+                            console.log(`Nomor pelanggan ditemukan dari tag key: ${customerNumber}`);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
         // Format konten pesan
         let content = `Status: *${status ? 'Online ✅' : 'Offline ❌'}*\n`;
         content += `Model: ${model}\n`;
         content += `Serial Number: ${serialNumber}\n`;
+        content += `Nomor Pelanggan: *${customerNumber}*\n`;
         content += `Username PPPoE: ${pppUsername}\n`;
         content += `MAC Address: ${macAddress}\n`;
         content += `Uptime: ${formattedUptime}\n\n`;
@@ -264,76 +419,105 @@ async function updateWifiSettingViaWhatsApp(deviceId, settingType, newValue, gen
             return "Parameter tidak lengkap.";
         }
         
-        // Tentukan path parameter berdasarkan jenis pengaturan
-        let paramPaths = [];
+        console.log(`Update WiFi request via WhatsApp: ${settingType}=${newValue} for device ${deviceId}`);
+        
+        // Siapkan parameter untuk update
+        let ssid2G, ssid5G, password2G, password5G;
         let paramName;
         
+        // Tentukan parameter yang akan diupdate berdasarkan jenis pengaturan
         switch (settingType) {
             case 'ssid2G':
-                paramPaths = [
-                    "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID"
-                ];
+                ssid2G = newValue;
                 paramName = "SSID 2.4G";
                 break;
             case 'ssid5G':
-                paramPaths = [
-                    "InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.SSID"
-                ];
+                ssid5G = newValue;
                 paramName = "SSID 5G";
                 break;
             case 'password2G':
-                paramPaths = [
-                    "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase",
-                    "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase"
-                ];
+                password2G = newValue;
                 paramName = "Password WiFi 2.4G";
                 break;
             case 'password5G':
-                paramPaths = [
-                    "InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.KeyPassphrase",
-                    "InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.PreSharedKey.5.KeyPassphrase"
-                ];
+                password5G = newValue;
                 paramName = "Password WiFi 5G";
                 break;
             default:
                 return "Jenis pengaturan tidak valid.";
         }
         
-        // Buat payload untuk update parameter
-        // Kita akan mencoba semua kemungkinan path parameter
-        const tasks = [];
+        // Buat array parameterValues seperti di web portal
+        const parameterValues = [];
         
-        // Buat task untuk setiap path parameter
-        for (const paramPath of paramPaths) {
-            tasks.push({
+        // Tambahkan parameter yang akan diupdate
+        if (ssid2G) {
+            parameterValues.push(
+                ["InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.SSID", ssid2G, "xsd:string"]
+            );
+        }
+        
+        if (ssid5G) {
+            parameterValues.push(
+                ["InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.SSID", ssid5G, "xsd:string"]
+            );
+        }
+        
+        if (password2G) {
+            parameterValues.push(
+                ["InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.PreSharedKey.1.KeyPassphrase", password2G, "xsd:string"],
+                ["InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.KeyPassphrase", password2G, "xsd:string"]
+            );
+        }
+        
+        if (password5G) {
+            parameterValues.push(
+                ["InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.PreSharedKey.1.KeyPassphrase", password5G, "xsd:string"],
+                ["InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.KeyPassphrase", password5G, "xsd:string"]
+            );
+        }
+        
+        if (parameterValues.length === 0) {
+            return "Tidak ada parameter yang diubah.";
+        }
+        
+        // Encode device ID untuk URL
+        const encodedDeviceId = encodeURIComponent(deviceId);
+        
+        // Kirim task ke GenieACS seperti di web portal
+        console.log('Mengirim task setParameterValues ke GenieACS...');
+        const taskResponse = await axios({
+            method: 'POST',
+            url: `${genieacsUrl}/devices/${encodedDeviceId}/tasks`,
+            data: {
                 name: "setParameterValues",
-                parameterValues: [
-                    [paramPath, newValue, "xsd:string"]
-                ]
-            });
-        }
-        
-        // Kirim request ke GenieACS untuk setiap path parameter
-        for (const task of tasks) {
-            try {
-                await axios.post(
-                    `${genieacsUrl}/devices/${encodeURIComponent(deviceId)}/tasks`,
-                    [task],
-                    { auth }
-                );
-                console.log(`Berhasil update parameter ${task.parameterValues[0][0]} untuk device ${deviceId}`);
-            } catch (error) {
-                console.error(`Error updating parameter ${task.parameterValues[0][0]}:`, error.message);
-                // Lanjutkan ke path berikutnya jika ada error
+                parameterValues: parameterValues
+            },
+            auth: auth,
+            headers: {
+                'Content-Type': 'application/json'
             }
-        }
+        });
         
-        // Kirim request untuk refresh perangkat
-        await axios.post(
-            `${genieacsUrl}/devices/${encodeURIComponent(deviceId)}/tasks`,
-            [{ name: "refreshObject", objectName: "" }],
-            { auth }
-        );
+        console.log('Response dari GenieACS:', {
+            status: taskResponse.status,
+            data: taskResponse.data
+        });
+        
+        // Kirim refreshObject untuk menerapkan perubahan
+        console.log('Mengirim task refreshObject ke GenieACS...');
+        await axios({
+            method: 'POST',
+            url: `${genieacsUrl}/devices/${encodedDeviceId}/tasks`,
+            data: {
+                name: "refreshObject",
+                objectName: "InternetGatewayDevice.LANDevice.1.WLANConfiguration"
+            },
+            auth: auth,
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
         
         // Baca pengaturan untuk header dan footer
         let settings;
@@ -409,14 +593,21 @@ async function rebootDevice(deviceId, genieacsUrl, auth) {
 // Fungsi untuk mendapatkan informasi perangkat terhubung
 async function getConnectedDevicesMessage(deviceId, genieacsUrl, auth, getParameterWithPaths, parameterPaths) {
     try {
-        // Ambil data perangkat dari GenieACS
-        const response = await axios.get(`${genieacsUrl}/devices/${encodeURIComponent(deviceId)}`, { auth });
+        // Ambil data perangkat dari GenieACS menggunakan query alih-alih akses langsung
+        // Ini menghindari error 405 Method Not Allowed
+        const query = encodeURIComponent(JSON.stringify({"_id": deviceId}));
+        console.log(`Mencari perangkat dengan query: ${query}`);
+        const response = await axios.get(`${genieacsUrl}/devices/?query=${query}`, { auth });
         
-        if (!response.data) {
+        // Endpoint query mengembalikan array, bukan objek tunggal
+        if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
+            console.log('Perangkat tidak ditemukan dalam respons query');
             return "Perangkat tidak ditemukan.";
         }
         
-        const device = response.data;
+        // Ambil perangkat pertama dari hasil query
+        const device = response.data[0];
+        console.log(`Perangkat ditemukan: ${device._id}`);
         
         // Coba dapatkan data perangkat terhubung
         const connectedDevices = [];
@@ -514,17 +705,134 @@ async function getConnectedDevicesMessage(deviceId, genieacsUrl, auth, getParame
     }
 }
 
+// Fungsi untuk mendapatkan daftar perangkat dan nomor pelanggan
+async function getDeviceListMessage(genieacsUrl, auth) {
+    try {
+        // Ambil semua perangkat dari GenieACS
+        console.log('Mengambil daftar semua perangkat...');
+        const response = await axios.get(`${genieacsUrl}/devices`, { auth });
+        
+        if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
+            return "Tidak ada perangkat yang ditemukan.";
+        }
+        
+        console.log(`Total perangkat: ${response.data.length}`);
+        
+        // Kumpulkan informasi perangkat dan nomor pelanggan
+        const deviceList = [];
+        
+        for (const device of response.data) {
+            let customerNumber = 'N/A';
+            let deviceModel = 'N/A';
+            let serialNumber = 'N/A';
+            
+            // Ambil nomor pelanggan dari tags
+            if (device._tags) {
+                // Cek jika ada tag customerNumber
+                if (device._tags.customerNumber) {
+                    customerNumber = device._tags.customerNumber;
+                } else {
+                    // Cek jika ada tag yang merupakan nomor telepon (minimal 5 digit)
+                    for (const tag in device._tags) {
+                        if (tag.length >= 5 && /^\d+$/.test(tag)) {
+                            customerNumber = tag;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // Ambil model dan serial number jika tersedia
+            if (device.InternetGatewayDevice?.DeviceInfo?.ProductClass?._value) {
+                deviceModel = device.InternetGatewayDevice.DeviceInfo.ProductClass._value;
+            }
+            
+            if (device.InternetGatewayDevice?.DeviceInfo?.SerialNumber?._value) {
+                serialNumber = device.InternetGatewayDevice.DeviceInfo.SerialNumber._value;
+            }
+            
+            deviceList.push({
+                id: device._id,
+                customerNumber,
+                model: deviceModel,
+                serialNumber
+            });
+        }
+        
+        // Urutkan berdasarkan nomor pelanggan
+        deviceList.sort((a, b) => {
+            if (a.customerNumber === 'N/A') return 1;
+            if (b.customerNumber === 'N/A') return -1;
+            return a.customerNumber.localeCompare(b.customerNumber);
+        });
+        
+        // Format pesan
+        let content = `*Daftar Perangkat dan Nomor Pelanggan*\n\n`;
+        content += `Total Perangkat: ${deviceList.length}\n\n`;
+        
+        // Batasi jumlah perangkat yang ditampilkan untuk menghindari pesan terlalu panjang
+        const maxDevicesToShow = 20;
+        const shownDevices = deviceList.slice(0, maxDevicesToShow);
+        
+        for (let i = 0; i < shownDevices.length; i++) {
+            const device = shownDevices[i];
+            content += `${i+1}. *${device.customerNumber}*\n`;
+            content += `   Model: ${device.model}\n`;
+            content += `   SN: ${device.serialNumber}\n\n`;
+        }
+        
+        if (deviceList.length > maxDevicesToShow) {
+            content += `...dan ${deviceList.length - maxDevicesToShow} perangkat lainnya.\n`;
+        }
+        
+        // Baca pengaturan untuk header dan footer
+        let settings;
+        try {
+            const settingsFile = path.join(process.cwd(), 'settings.json');
+            settings = JSON.parse(fs.readFileSync(settingsFile));
+        } catch (error) {
+            console.error('Error reading settings:', error);
+            settings = {};
+        }
+        
+        // Format pesan dengan header dan footer
+        const message = formatWhatsAppMessage('Daftar Perangkat', content, settings);
+        
+        return message;
+    } catch (error) {
+        console.error('Error getting device list:', error);
+        // Baca pengaturan untuk header dan footer
+        let settings;
+        try {
+            const settingsFile = path.join(process.cwd(), 'settings.json');
+            settings = JSON.parse(fs.readFileSync(settingsFile));
+        } catch (err) {
+            console.error('Error reading settings:', err);
+            settings = {};
+        }
+        
+        return WHATSAPP_MESSAGES.ERROR(error.message, settings);
+    }
+}
+
 // Fungsi untuk mendapatkan informasi pengguna
 async function getUserInfoMessage(deviceId, genieacsUrl, auth, getParameterWithPaths, parameterPaths, getRxPowerClass) {
     try {
-        // Ambil data perangkat dari GenieACS
-        const response = await axios.get(`${genieacsUrl}/devices/${encodeURIComponent(deviceId)}`, { auth });
+        // Ambil data perangkat dari GenieACS menggunakan query alih-alih akses langsung
+        // Ini menghindari error 405 Method Not Allowed
+        const query = encodeURIComponent(JSON.stringify({"_id": deviceId}));
+        console.log(`Mencari perangkat dengan query: ${query}`);
+        const response = await axios.get(`${genieacsUrl}/devices/?query=${query}`, { auth });
         
-        if (!response.data) {
+        // Endpoint query mengembalikan array, bukan objek tunggal
+        if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
+            console.log('Perangkat tidak ditemukan dalam respons query');
             return "Perangkat tidak ditemukan.";
         }
         
-        const device = response.data;
+        // Ambil perangkat pertama dari hasil query
+        const device = response.data[0];
+        console.log(`Perangkat ditemukan: ${device._id}`);
         
         // Ambil parameter perangkat menggunakan parameterPaths dari app.js
         const serialNumber = getParameterWithPaths(device, parameterPaths.serialNumber) || 'N/A';
@@ -541,12 +849,48 @@ async function getUserInfoMessage(deviceId, genieacsUrl, auth, getParameterWithP
         const userConnected2G = getParameterWithPaths(device, parameterPaths.userConnected2G) || '0';
         const userConnected5G = getParameterWithPaths(device, parameterPaths.userConnected5G) || '0';
         const uptime = getParameterWithPaths(device, parameterPaths.uptime);
-        const formattedUptime = uptime ? formatUptime(uptime) : 'N/A';
+        // Periksa jika uptime sudah dalam format string (1d 04:26:59) atau angka (seconds)
+        let formattedUptime;
+        if (uptime) {
+            if (typeof uptime === 'string' && uptime.includes('d') && uptime.includes(':')) {
+                // Uptime sudah dalam format string, gunakan langsung
+                formattedUptime = uptime;
+                console.log(`Menggunakan format uptime yang sudah ada: ${uptime}`);
+            } else if (!isNaN(uptime)) {
+                // Uptime dalam format angka (detik), konversi menggunakan formatUptime
+                formattedUptime = formatUptime(uptime);
+                console.log(`Mengkonversi uptime dari detik: ${uptime} -> ${formattedUptime}`);
+            } else {
+                // Format tidak dikenali
+                formattedUptime = 'N/A';
+                console.log(`Format uptime tidak dikenali: ${uptime}`);
+            }
+        } else {
+            formattedUptime = 'N/A';
+        }
+        
+        // Dapatkan nomor pelanggan dari tags
+        let customerNumber = 'N/A';
+        if (device._tags) {
+            // Cek jika ada tag customerNumber
+            if (device._tags.customerNumber) {
+                customerNumber = device._tags.customerNumber;
+            } else {
+                // Cek jika ada tag yang merupakan nomor telepon (minimal 5 digit)
+                for (const tag in device._tags) {
+                    if (tag.length >= 5 && /^\d+$/.test(tag)) {
+                        customerNumber = tag;
+                        break;
+                    }
+                }
+            }
+        }
         
         // Format konten pesan
         let content = `💻 *Informasi Perangkat*\n`;
         content += `Model: ${model}\n`;
         content += `Serial Number: ${serialNumber}\n`;
+        content += `Nomor Pelanggan: *${customerNumber}*\n`;
         content += `MAC Address: ${macAddress}\n`;
         content += `Uptime: ${formattedUptime}\n\n`;
         
@@ -805,14 +1149,25 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
                 return WHATSAPP_MESSAGES.NOT_REGISTERED(settings);
             }
             
-            // Ambil informasi perangkat terhubung
+            // Ambil daftar perangkat terhubung
             return await getConnectedDevicesMessage(deviceId, genieacsUrl, auth, getParameterWithPaths, parameterPaths);
+        }
+        
+        // Perintah untuk melihat daftar perangkat dan nomor pelanggan (khusus admin)
+        else if (WHATSAPP_COMMANDS.LIST_DEVICES.includes(command)) {
+            // Hanya admin yang boleh menggunakan perintah ini
+            if (!isAdmin) {
+                return WHATSAPP_MESSAGES.ADMIN_ONLY(settings);
+            }
+            
+            // Ambil daftar semua perangkat dan nomor pelanggan
+            return await getDeviceListMessage(genieacsUrl, auth);
         }
         
         // Perintah untuk reboot perangkat (khusus admin)
         else if (WHATSAPP_COMMANDS.REBOOT.includes(command)) {
             if (!isAdmin) {
-                return WHATSAPP_MESSAGES.ADMIN_ONLY;
+                return WHATSAPP_MESSAGES.ADMIN_ONLY(settings);
             }
             
             // Admin harus menyediakan nomor pelanggan
@@ -881,5 +1236,6 @@ module.exports = {
     rebootDevice,
     getConnectedDevicesMessage,
     getUserInfoMessage,
+    getDeviceListMessage,
     processWhatsAppMessage
 };
