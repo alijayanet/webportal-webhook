@@ -886,8 +886,8 @@ async function getDeviceListMessage(genieacsUrl, auth) {
         
         for (const device of response.data) {
             let customerNumber = 'N/A';
-            let deviceModel = 'N/A';
-            let serialNumber = 'N/A';
+            let pppUsername = 'N/A';
+            let pppoeIP = 'N/A';
             
             // Ambil nomor pelanggan dari tags
             if (device._tags) {
@@ -905,20 +905,29 @@ async function getDeviceListMessage(genieacsUrl, auth) {
                 }
             }
             
-            // Ambil model dan serial number jika tersedia
-            if (device.InternetGatewayDevice?.DeviceInfo?.ProductClass?._value) {
-                deviceModel = device.InternetGatewayDevice.DeviceInfo.ProductClass._value;
+            // Ambil PPPoE username
+            if (device.InternetGatewayDevice?.WANDevice?.["1"]?.WANConnectionDevice?.["1"]?.WANPPPConnection?.["1"]?.Username?._value) {
+                pppUsername = device.InternetGatewayDevice.WANDevice["1"].WANConnectionDevice["1"].WANPPPConnection["1"].Username._value;
+            } else if (device.VirtualParameters?.pppoeUsername?._value) {
+                pppUsername = device.VirtualParameters.pppoeUsername._value;
+            } else if (device.VirtualParameters?.pppUsername?._value) {
+                pppUsername = device.VirtualParameters.pppUsername._value;
             }
             
-            if (device.InternetGatewayDevice?.DeviceInfo?.SerialNumber?._value) {
-                serialNumber = device.InternetGatewayDevice.DeviceInfo.SerialNumber._value;
+            // Ambil PPPoE IP
+            if (device.InternetGatewayDevice?.WANDevice?.["1"]?.WANConnectionDevice?.["1"]?.WANPPPConnection?.["1"]?.ExternalIPAddress?._value) {
+                pppoeIP = device.InternetGatewayDevice.WANDevice["1"].WANConnectionDevice["1"].WANPPPConnection["1"].ExternalIPAddress._value;
+            } else if (device.VirtualParameters?.pppoeIP?._value) {
+                pppoeIP = device.VirtualParameters.pppoeIP._value;
+            } else if (device.VirtualParameters?.pppIP?._value) {
+                pppoeIP = device.VirtualParameters.pppIP._value;
             }
             
             deviceList.push({
                 id: device._id,
                 customerNumber,
-                model: deviceModel,
-                serialNumber
+                pppUsername,
+                pppoeIP
             });
         }
         
@@ -930,7 +939,7 @@ async function getDeviceListMessage(genieacsUrl, auth) {
         });
         
         // Format pesan
-        let content = `*Daftar Perangkat dan Nomor Pelanggan*\n\n`;
+        let content = `*Daftar Perangkat dan Informasi Pelanggan*\n\n`;
         content += `Total Perangkat: ${deviceList.length}\n\n`;
         
         // Batasi jumlah perangkat yang ditampilkan untuk menghindari pesan terlalu panjang
@@ -940,8 +949,8 @@ async function getDeviceListMessage(genieacsUrl, auth) {
         for (let i = 0; i < shownDevices.length; i++) {
             const device = shownDevices[i];
             content += `${i+1}. *${device.customerNumber}*\n`;
-            content += `   Model: ${device.model}\n`;
-            content += `   SN: ${device.serialNumber}\n\n`;
+            content += `   Username PPPoE: ${device.pppUsername}\n`;
+            content += `   IP PPPoE: ${device.pppoeIP}\n\n`;
         }
         
         if (deviceList.length > maxDevicesToShow) {
