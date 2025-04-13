@@ -8,7 +8,7 @@ const path = require('path');
 // Fungsi untuk membuat koneksi ke Mikrotik
 async function createMikrotikConnection() {
     try {
-        // Baca pengaturan dari settings.json
+        // Baca pengaturan dari settings.json - selalu baca ulang untuk mendapatkan pengaturan terbaru
         let settings;
         try {
             const settingsFile = path.join(process.cwd(), 'settings.json');

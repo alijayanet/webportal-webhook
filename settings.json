@@ -28,5 +28,12 @@
     "password": "087828060111",
     "enabled": true
   },
-  "otpMessage": "Kode OTP Anda untuk login WebPortal: {{otp}}. Kode ini berlaku selama {{expiry}} menit. ALIJAYA-NET"
+  "otpMessage": "Kode OTP Anda untuk login WebPortal: {{otp}}. Kode ini berlaku selama {{expiry}} menit. ALIJAYA-NET",
+  "server": {
+    "genieacsUrl": "http://192.168.8.89:7557",
+    "genieacsUsername": "acs",
+    "genieacsPassword": "060111",
+    "adminUsername": "alijaya",
+    "adminPassword": "060111"
+  }
 }

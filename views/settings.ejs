@@ -79,13 +79,13 @@
     <div class="container mt-4">
         <h2 class="mb-4"><i class="fas fa-cog me-2"></i>Pengaturan Sistem</h2>
         
-        <% if (error) { %>
+        <% if (typeof error !== 'undefined' && error) { %>
             <div class="alert alert-danger">
                 <%= error %>
             </div>
         <% } %>
         
-        <% if (success) { %>
+        <% if (typeof success !== 'undefined' && success) { %>
             <div class="alert alert-success">
                 <%= success %>
             </div>
@@ -353,17 +353,17 @@
                                     <h6 class="mb-3">GenieACS Configuration</h6>
                                     <div class="mb-3">
                                         <label for="genieacsUrl" class="form-label">GenieACS URL</label>
-                                        <input type="text" class="form-control" id="genieacsUrl" name="genieacsUrl" required>
+                                        <input type="text" class="form-control" id="genieacsUrl" name="genieacsUrl" value="<%= settings?.server?.genieacsUrl || process.env.GENIEACS_URL || '' %>" required>
                                         <div class="form-text">Format: http://ip-address:port // port API Genieacs 7557</div>
                                     </div>
                                     <div class="mb-3">
                                         <label for="genieacsUsername" class="form-label">GenieACS Username</label>
-                                        <input type="text" class="form-control" id="genieacsUsername" name="genieacsUsername" required>
+                                        <input type="text" class="form-control" id="genieacsUsername" name="genieacsUsername" value="<%= settings?.server?.genieacsUsername || process.env.GENIEACS_USERNAME || '' %>" required>
                                     </div>
                                     <div class="mb-3">
                                         <label for="genieacsPassword" class="form-label">GenieACS Password</label>
                                         <div class="input-group">
-                                            <input type="password" class="form-control" id="genieacsPassword" name="genieacsPassword" required>
+                                            <input type="password" class="form-control" id="genieacsPassword" name="genieacsPassword" value="<%= settings?.server?.genieacsPassword || process.env.GENIEACS_PASSWORD || '' %>" required>
                                             <button class="btn btn-outline-secondary toggle-password" type="button" data-target="genieacsPassword">
                                                 <i class="fas fa-eye"></i>
                                             </button>
@@ -374,12 +374,12 @@
                                     <h6 class="mb-3">Admin Credentials</h6>
                                     <div class="mb-3">
                                         <label for="adminUsername" class="form-label">Admin Username</label>
-                                        <input type="text" class="form-control" id="adminUsername" name="adminUsername" required>
+                                        <input type="text" class="form-control" id="adminUsername" name="adminUsername" value="<%= settings?.server?.adminUsername || process.env.ADMIN_USERNAME || '' %>" required>
                                     </div>
                                     <div class="mb-3">
                                         <label for="adminPassword" class="form-label">Admin Password</label>
                                         <div class="input-group">
-                                            <input type="password" class="form-control" id="adminPassword" name="adminPassword" required>
+                                            <input type="password" class="form-control" id="adminPassword" name="adminPassword" value="<%= settings?.server?.adminPassword || process.env.ADMIN_PASSWORD || '' %>" required>
                                             <button class="btn btn-outline-secondary toggle-password" type="button" data-target="adminPassword">
                                                 <i class="fas fa-eye"></i>
                                             </button>
@@ -645,6 +645,40 @@
             });
             
             // Menghandle form pengaturan Mikrotik API
+            // Handler untuk form pengaturan server
+            $('#serverSettingsForm').submit(async function(e) {
+                e.preventDefault();
+                
+                const formData = {
+                    genieacsUrl: $('#genieacsUrl').val(),
+                    genieacsUsername: $('#genieacsUsername').val(),
+                    genieacsPassword: $('#genieacsPassword').val(),
+                    adminUsername: $('#adminUsername').val(),
+                    adminPassword: $('#adminPassword').val()
+                };
+                
+                try {
+                    const response = await fetch('/admin/save-server-settings', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showToast('success', 'Pengaturan server berhasil disimpan');
+                    } else {
+                        showToast('error', data.message || 'Gagal menyimpan pengaturan server');
+                    }
+                } catch (error) {
+                    console.error('Error updating server settings:', error);
+                    showToast('error', 'Terjadi kesalahan saat menyimpan pengaturan server');
+                }
+            });
+            
             $('#mikrotikSettingsForm').submit(async function(e) {
                 e.preventDefault();
                 

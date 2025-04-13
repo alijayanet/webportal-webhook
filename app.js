@@ -21,7 +21,39 @@ function updateEnvVariable(variable, value) {
         console.error(`Error updating ${variable} in .env:`, error);
     }
 }
+
+// Fungsi untuk memuat pengaturan dari settings.json dan menerapkannya ke process.env
+function loadSettings() {
+    try {
+        const settingsPath = path.join(__dirname, 'settings.json');
+        if (fs.existsSync(settingsPath)) {
+            const settingsData = fs.readFileSync(settingsPath, 'utf8');
+            const settings = JSON.parse(settingsData);
+            
+            // Muat pengaturan server jika ada
+            if (settings.server) {
+                process.env.GENIEACS_URL = settings.server.genieacsUrl || process.env.GENIEACS_URL;
+                process.env.GENIEACS_USERNAME = settings.server.genieacsUsername || process.env.GENIEACS_USERNAME;
+                process.env.GENIEACS_PASSWORD = settings.server.genieacsPassword || process.env.GENIEACS_PASSWORD;
+                process.env.ADMIN_USERNAME = settings.server.adminUsername || process.env.ADMIN_USERNAME;
+                process.env.ADMIN_PASSWORD = settings.server.adminPassword || process.env.ADMIN_PASSWORD;
+                
+                console.log('Pengaturan server dimuat dari settings.json');
+            }
+            
+            return settings;
+        }
+    } catch (error) {
+        console.error('Error loading settings:', error);
+    }
+    
+    return {};
+}
+
 require('dotenv').config();
+
+// Muat pengaturan dari settings.json setelah memuat .env
+const appSettings = loadSettings();
 const multer = require('multer');
 
 // Import WhatsApp handler
@@ -1343,6 +1375,8 @@ app.get('/admin/logout', (req, res) => {
     res.redirect('/admin/login');
 });
 
+
+
 // Add this endpoint to handle device refresh
 app.post('/refresh-device', async (req, res) => {
     try {
@@ -1812,14 +1846,26 @@ app.get('/admin/logout', (req, res) => {
     res.redirect('/admin/login');
 });
 
-// Tambahkan route untuk pengaturan OTP dan WhatsApp gateway
+// Route untuk halaman pengaturan admin
 app.get('/admin/settings', (req, res) => {
     if (!req.session.isAdmin) {
         return res.redirect('/admin/login');
     }
-
+    
     try {
+        // Baca pengaturan dari settings.json
         const settings = JSON.parse(fs.readFileSync(SETTINGS_FILE));
+        
+        // Pastikan settings.server ada untuk halaman pengaturan server
+        if (!settings.server) {
+            settings.server = {
+                genieacsUrl: process.env.GENIEACS_URL || '',
+                genieacsUsername: process.env.GENIEACS_USERNAME || '',
+                genieacsPassword: process.env.GENIEACS_PASSWORD || '',
+                adminUsername: process.env.ADMIN_USERNAME || '',
+                adminPassword: process.env.ADMIN_PASSWORD || ''
+            };
+        }
         
         // Buat base URL untuk webhook
         const host = req.get('host');
@@ -1827,13 +1873,13 @@ app.get('/admin/settings', (req, res) => {
         const webhookBaseUrl = `${protocol}://${host}`;
         
         res.render('settings', { 
-            settings, 
+            settings: settings,
             error: null,
             success: null,
             webhookBaseUrl
         });
     } catch (error) {
-        console.error('Error loading settings:', error);
+        console.error('Error loading settings page:', error);
         
         // Buat base URL untuk webhook meskipun terjadi error
         const host = req.get('host');
@@ -1841,8 +1887,8 @@ app.get('/admin/settings', (req, res) => {
         const webhookBaseUrl = `${protocol}://${host}`;
         
         res.render('settings', { 
-            settings: {}, 
-            error: 'Gagal memuat pengaturan',
+            settings: {},
+            error: 'Gagal memuat pengaturan: ' + error.message,
             success: null,
             webhookBaseUrl
         });
@@ -2134,25 +2180,48 @@ app.post('/admin/save-server-settings', async (req, res) => {
             });
         }
         
-        // Baca file .env yang ada
-        let envContent = fs.readFileSync('.env', 'utf8');
+        console.log('Menyimpan pengaturan server baru:', {
+            genieacsUrl,
+            genieacsUsername,
+            adminUsername
+        });
         
-        // Update semua variabel
+        // Baca settings.json yang ada
+        const settingsPath = path.join(__dirname, 'settings.json');
+        let settings = {};
+        
+        if (fs.existsSync(settingsPath)) {
+            const settingsData = fs.readFileSync(settingsPath, 'utf8');
+            settings = JSON.parse(settingsData);
+        }
+        
+        // Tambahkan pengaturan server ke settings.json
+        settings.server = {
+            genieacsUrl,
+            genieacsUsername,
+            genieacsPassword,
+            adminUsername,
+            adminPassword
+        };
+        
+        // Simpan kembali ke settings.json
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+        
+        // Update nilai di process.env untuk digunakan langsung tanpa restart
+        process.env.GENIEACS_URL = genieacsUrl;
+        process.env.GENIEACS_USERNAME = genieacsUsername;
+        process.env.GENIEACS_PASSWORD = genieacsPassword;
+        process.env.ADMIN_USERNAME = adminUsername;
+        process.env.ADMIN_PASSWORD = adminPassword;
+        
+        // Juga update di .env untuk kompatibilitas
         updateEnvVariable('GENIEACS_URL', genieacsUrl);
         updateEnvVariable('GENIEACS_USERNAME', genieacsUsername);
         updateEnvVariable('GENIEACS_PASSWORD', genieacsPassword);
         updateEnvVariable('ADMIN_USERNAME', adminUsername);
         updateEnvVariable('ADMIN_PASSWORD', adminPassword);
         
-        // Simpan kembali file .env
-        fs.writeFileSync('.env', envContent);
-        
-        // Update nilai di process.env
-        process.env.GENIEACS_URL = genieacsUrl;
-        process.env.GENIEACS_USERNAME = genieacsUsername;
-        process.env.GENIEACS_PASSWORD = genieacsPassword;
-        process.env.ADMIN_USERNAME = adminUsername;
-        process.env.ADMIN_PASSWORD = adminPassword;
+        console.log('Pengaturan server berhasil diperbarui');
         
         res.json({ success: true, message: 'Pengaturan server berhasil disimpan' });
     } catch (error) {
