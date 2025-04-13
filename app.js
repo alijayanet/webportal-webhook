@@ -3,6 +3,24 @@ const session = require('express-session');
 const path = require('path');
 const axios = require('axios');
 const fs = require('fs');
+
+// Update nilai untuk variabel yang ada di .env
+function updateEnvVariable(variable, value) {
+    try {
+        let envContent = fs.readFileSync('.env', 'utf8');
+        const regex = new RegExp(`${variable}=.*`, 'g');
+        
+        if (envContent.match(regex)) {
+            envContent = envContent.replace(regex, `${variable}=${value}`);
+        } else {
+            envContent += `\n${variable}=${value}`;
+        }
+        
+        fs.writeFileSync('.env', envContent);
+    } catch (error) {
+        console.error(`Error updating ${variable} in .env:`, error);
+    }
+}
 require('dotenv').config();
 const multer = require('multer');
 
@@ -1985,7 +2003,11 @@ app.get('/admin/get-server-settings', async (req, res) => {
                 GENIEACS_USERNAME: settings.GENIEACS_USERNAME || '',
                 GENIEACS_PASSWORD: settings.GENIEACS_PASSWORD || '',
                 ADMIN_USERNAME: settings.ADMIN_USERNAME || '',
-                ADMIN_PASSWORD: settings.ADMIN_PASSWORD || ''
+                ADMIN_PASSWORD: settings.ADMIN_PASSWORD || '',
+                MIKROTIK_HOST: settings.MIKROTIK_HOST || '',
+                MIKROTIK_PORT: settings.MIKROTIK_PORT || '',
+                MIKROTIK_USERNAME: settings.MIKROTIK_USERNAME || '',
+                MIKROTIK_PASSWORD: settings.MIKROTIK_PASSWORD || ''
             }
         });
     } catch (error) {
@@ -1993,6 +2015,104 @@ app.get('/admin/get-server-settings', async (req, res) => {
         res.status(500).json({ 
             success: false, 
             message: 'Gagal membaca pengaturan server: ' + error.message 
+        });
+    }
+});
+
+// Endpoint untuk update pengaturan Mikrotik API
+app.post('/admin/update-mikrotik-settings', async (req, res) => {
+    if (!req.session.isAdmin) {
+        return res.status(403).json({ success: false, message: 'Tidak diizinkan' });
+    }
+
+    try {
+        const { enabled, host, port, username, password } = req.body;
+        
+        // Validasi
+        if (!host) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Host/IP Address harus diisi' 
+            });
+        }
+        
+        if (!port || isNaN(port)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Port harus berupa angka' 
+            });
+        }
+        
+        // Baca pengaturan yang ada
+        const currentSettings = JSON.parse(fs.readFileSync(SETTINGS_FILE));
+        
+        // Pastikan objek mikrotik ada
+        if (!currentSettings.mikrotik) {
+            currentSettings.mikrotik = {};
+        }
+        
+        // Update pengaturan Mikrotik
+        currentSettings.mikrotik.enabled = enabled;
+        currentSettings.mikrotik.host = host;
+        currentSettings.mikrotik.port = parseInt(port);
+        currentSettings.mikrotik.username = username;
+        currentSettings.mikrotik.password = password;
+        
+        // Simpan pengaturan ke settings.json
+        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(currentSettings, null, 2));
+        
+        // Update juga file .env
+        updateEnvVariable('MIKROTIK_HOST', host);
+        updateEnvVariable('MIKROTIK_PORT', port);
+        updateEnvVariable('MIKROTIK_USERNAME', username);
+        updateEnvVariable('MIKROTIK_PASSWORD', password);
+        
+        res.json({ success: true, message: 'Pengaturan Mikrotik API berhasil disimpan' });
+    } catch (error) {
+        console.error('Error saving Mikrotik API settings:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Gagal menyimpan pengaturan Mikrotik API: ' + error.message 
+        });
+    }
+});
+
+// Endpoint untuk test koneksi Mikrotik
+app.post('/admin/test-mikrotik-connection', async (req, res) => {
+    if (!req.session.isAdmin) {
+        return res.status(403).json({ success: false, message: 'Tidak diizinkan' });
+    }
+
+    try {
+        const { host, port, username, password } = req.body;
+        
+        // Gunakan modul node-routeros untuk test koneksi
+        const RouterOSAPI = require('node-routeros').RouterOSAPI;
+        
+        // Buat konfigurasi koneksi
+        const conn = new RouterOSAPI({
+            host: host,
+            port: parseInt(port),
+            user: username,
+            password: password,
+            timeout: 10000 // 10 detik timeout
+        });
+        
+        // Connect ke router
+        await conn.connect();
+        
+        // Jika berhasil connect, lakukan perintah sederhana untuk memastikan koneksi berfungsi
+        await conn.write('/system/identity/print');
+        
+        // Tutup koneksi
+        conn.close();
+        
+        res.json({ success: true, message: 'Koneksi ke Mikrotik berhasil' });
+    } catch (error) {
+        console.error('Error testing Mikrotik connection:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Gagal terhubung ke Mikrotik: ' + (error.message || JSON.stringify(error)) 
         });
     }
 });
@@ -2016,17 +2136,6 @@ app.post('/admin/save-server-settings', async (req, res) => {
         
         // Baca file .env yang ada
         let envContent = fs.readFileSync('.env', 'utf8');
-        
-        // Update nilai untuk variabel yang ada
-        const updateEnvVariable = (variable, value) => {
-            const regex = new RegExp(`${variable}=.*`, 'g');
-            if (envContent.match(regex)) {
-                envContent = envContent.replace(regex, `${variable}=${value}`);
-            } else {
-                // Jika variabel tidak ditemukan, tambahkan di akhir file
-                envContent += `\n${variable}=${value}`;
-            }
-        };
         
         // Update semua variabel
         updateEnvVariable('GENIEACS_URL', genieacsUrl);

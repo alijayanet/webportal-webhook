@@ -103,6 +103,11 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
+                <button class="nav-link" id="mikrotik-tab" data-bs-toggle="tab" data-bs-target="#mikrotik" type="button" role="tab" aria-controls="mikrotik" aria-selected="false">
+                    <i class="fas fa-network-wired me-2"></i>Mikrotik API
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
                 <button class="nav-link" id="server-tab" data-bs-toggle="tab" data-bs-target="#server" type="button" role="tab" aria-controls="server" aria-selected="false">
                     <i class="fas fa-server me-2"></i>Konfigurasi Server
                 </button>
@@ -275,6 +280,59 @@
                                 </button>
                                 <button type="button" id="testGateway" class="btn btn-success">
                                     <i class="fas fa-paper-plane me-2"></i>Test Gateway
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tab Mikrotik API Settings -->
+            <div class="tab-pane fade" id="mikrotik" role="tabpanel" aria-labelledby="mikrotik-tab">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-network-wired me-2"></i>Pengaturan Mikrotik API</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="mikrotikSettingsForm">
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="mikrotikEnabled" <%= settings.mikrotik?.enabled ? 'checked' : '' %>>
+                                <label class="form-check-label" for="mikrotikEnabled">Aktifkan Mikrotik API</label>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="mikrotikHost" class="form-label">Host/IP Address</label>
+                                    <input type="text" class="form-control" id="mikrotikHost" value="<%= settings.mikrotik?.host || '192.168.8.1' %>" placeholder="192.168.8.1">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="mikrotikPort" class="form-label">Port</label>
+                                    <input type="number" class="form-control" id="mikrotikPort" value="<%= settings.mikrotik?.port || 8728 %>" placeholder="8728">
+                                    <div class="form-text">Default: 8728 (API), 8729 (API-SSL)</div>
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="mikrotikUsername" class="form-label">Username</label>
+                                    <input type="text" class="form-control" id="mikrotikUsername" value="<%= settings.mikrotik?.username || 'admin' %>" placeholder="admin">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="mikrotikPassword" class="form-label">Password</label>
+                                    <input type="password" class="form-control" id="mikrotikPassword" value="<%= settings.mikrotik?.password || '' %>" placeholder="password">
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>Pengaturan ini digunakan untuk fitur manajemen Mikrotik melalui WhatsApp. Pastikan user Mikrotik memiliki hak akses yang cukup.
+                            </div>
+                            
+                            <div class="d-flex">
+                                <button type="submit" class="btn btn-primary me-2">
+                                    <i class="fas fa-save me-2"></i>Simpan Pengaturan Mikrotik
+                                </button>
+                                <button type="button" id="testMikrotik" class="btn btn-success">
+                                    <i class="fas fa-plug me-2"></i>Test Koneksi
                                 </button>
                             </div>
                         </form>
@@ -554,16 +612,18 @@
             document.getElementById('serverSettingsForm').addEventListener('submit', async function(e) {
                 e.preventDefault();
                 
+                const formData = {
+                    genieacsUrl: document.getElementById('genieacsUrl').value,
+                    genieacsUsername: document.getElementById('genieacsUsername').value,
+                    genieacsPassword: document.getElementById('genieacsPassword').value,
+                    sessionSecret: document.getElementById('sessionSecret').value,
+                    adminUsername: document.getElementById('adminUsername').value,
+                    adminPassword: document.getElementById('adminPassword').value,
+                    port: document.getElementById('port').value
+                };
+                
                 try {
-                    const formData = {
-                        genieacsUrl: document.getElementById('genieacsUrl').value,
-                        genieacsUsername: document.getElementById('genieacsUsername').value,
-                        genieacsPassword: document.getElementById('genieacsPassword').value,
-                        adminUsername: document.getElementById('adminUsername').value,
-                        adminPassword: document.getElementById('adminPassword').value
-                    };
-                    
-                    const response = await fetch('/admin/save-server-settings', {
+                    const response = await fetch('/admin/update-server-settings', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -571,16 +631,87 @@
                         body: JSON.stringify(formData)
                     });
                     
-                    const result = await response.json();
+                    const data = await response.json();
                     
-                    if (result.success) {
-                        showToast('success', result.message);
+                    if (data.success) {
+                        showToast('success', 'Pengaturan server berhasil disimpan');
                     } else {
-                        showToast('error', result.message);
+                        showToast('error', data.message || 'Gagal menyimpan pengaturan server');
                     }
                 } catch (error) {
-                    console.error('Error saving server settings:', error);
-                    showToast('error', 'Gagal menyimpan pengaturan server');
+                    console.error('Error updating server settings:', error);
+                    showToast('error', 'Terjadi kesalahan saat menyimpan pengaturan server');
+                }
+            });
+            
+            // Menghandle form pengaturan Mikrotik API
+            $('#mikrotikSettingsForm').submit(async function(e) {
+                e.preventDefault();
+                
+                const formData = {
+                    enabled: $('#mikrotikEnabled').is(':checked'),
+                    host: $('#mikrotikHost').val(),
+                    port: $('#mikrotikPort').val(),
+                    username: $('#mikrotikUsername').val(),
+                    password: $('#mikrotikPassword').val()
+                };
+                
+                try {
+                    const response = await fetch('/admin/update-mikrotik-settings', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showToast('success', 'Pengaturan Mikrotik API berhasil disimpan');
+                    } else {
+                        showToast('error', data.message || 'Gagal menyimpan pengaturan Mikrotik API');
+                    }
+                } catch (error) {
+                    console.error('Error updating Mikrotik API settings:', error);
+                    showToast('error', 'Terjadi kesalahan saat menyimpan pengaturan Mikrotik API');
+                }
+            });
+            
+            // Test koneksi Mikrotik API
+            $('#testMikrotik').click(async function() {
+                if (!confirm('Apakah Anda yakin ingin menguji koneksi ke Mikrotik?')) {
+                    return;
+                }
+                
+                const formData = {
+                    host: $('#mikrotikHost').val(),
+                    port: $('#mikrotikPort').val(),
+                    username: $('#mikrotikUsername').val(),
+                    password: $('#mikrotikPassword').val()
+                };
+                
+                try {
+                    showToast('info', 'Menguji koneksi ke Mikrotik...');
+                    
+                    const response = await fetch('/admin/test-mikrotik-connection', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(formData)
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showToast('success', 'Koneksi ke Mikrotik berhasil!');
+                    } else {
+                        showToast('error', data.message || 'Gagal terhubung ke Mikrotik');
+                    }
+                } catch (error) {
+                    console.error('Error testing Mikrotik connection:', error);
+                    showToast('error', 'Terjadi kesalahan saat menguji koneksi Mikrotik');
                 }
             });
             

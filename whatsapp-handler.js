@@ -5,6 +5,9 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
+// Import modul Mikrotik handler
+const mikrotikHandler = require('./mikrotik-handler');
+
 // Fungsi untuk mengirim notifikasi ke pelanggan
 async function sendNotificationToCustomer(customerNumber, message, settings) {
     try {
@@ -144,7 +147,20 @@ const WHATSAPP_COMMANDS = {
     PASSWORD_5G: ['pass5g', 'password5g', 'pwd5g'],
     USER_INFO: ['userinfo', 'user', 'pelanggan'],
     CONNECTED_DEVICES: ['devices', 'perangkat', 'connected'],
-    LIST_DEVICES: ['listdevices', 'daftarperangkat', 'listnomor']
+    LIST_DEVICES: ['listdevices', 'daftarperangkat', 'listnomor'],
+    // Perintah Mikrotik
+    ADD_HOTSPOT: ['addhotspot', 'tambahhotspot', 'addhs'],
+    DELETE_HOTSPOT: ['delhotspot', 'hapushotspot', 'delhs'],
+    ADD_PPPOE: ['addpppoe', 'tambahpppoe', 'addppp'],
+    DELETE_PPPOE: ['delpppoe', 'hapuspppoe', 'delppp'],
+    SET_PROFILE: ['setprofile', 'gantiprofile', 'setppp'],
+    LIST_PROFILES: ['listprofiles', 'daftarprofile', 'profiles'],
+    LIST_HOTSPOT: ['listhotspot', 'daftarhotspot', 'hotspots'],
+    LIST_PPPOE: ['listpppoe', 'daftarpppoe', 'pppoes'],
+    LIST_OFFLINE_PPPOE: ['offlinepppoe', 'pppoeoffline', 'offlineppp'],
+    // Perintah Monitoring Mikrotik
+    ROUTER_RESOURCE: ['resource', 'sysinfo', 'routerinfo'],
+    BANDWIDTH_USAGE: ['bandwidth', 'traffic', 'netmon']
 };
 
 // Konstanta untuk pesan WhatsApp
@@ -178,7 +194,21 @@ const WHATSAPP_MESSAGES = {
         content += "🔸 *ssid5g* [no_pelanggan] [nama] - Ubah SSID 5G pelanggan\n";
         content += "🔸 *pass2g* [no_pelanggan] [password] - Ubah password WiFi 2.4G pelanggan\n";
         content += "🔸 *pass5g* [no_pelanggan] [password] - Ubah password WiFi 5G pelanggan\n";
-        content += "🔸 *listdevices* - Lihat daftar semua perangkat dan nomor pelanggan";
+        content += "🔸 *listdevices* - Lihat daftar semua perangkat dan nomor pelanggan\n\n";
+        
+        content += "🔵 *Perintah Mikrotik:*\n";
+        content += "🔸 *addhotspot* [username] [password] [profile] - Tambah user hotspot\n";
+        content += "🔸 *delhotspot* [username] - Hapus user hotspot\n";
+        content += "🔸 *addpppoe* [username] [password] [profile] - Tambah secret PPPoE\n";
+        content += "🔸 *delpppoe* [username] - Hapus secret PPPoE\n";
+        content += "🔸 *setprofile* [username] [profile] - Ubah profile PPPoE\n";
+        content += "🔸 *listprofiles* - Lihat daftar profile PPPoE\n";
+        content += "🔸 *listhotspot* - Lihat daftar user hotspot yang aktif\n";
+        content += "🔸 *listpppoe* - Lihat daftar secret PPPoE\n";
+        content += "🔸 *offlinepppoe* - Lihat daftar user PPPoE yang offline\n";
+        content += "\n🔵 *Monitoring Router:*\n";
+        content += "🔸 *resource* - Lihat informasi resource router (CPU, memory, dll)\n";
+        content += "🔸 *bandwidth* - Lihat penggunaan bandwidth saat ini\n";
         
         return formatWhatsAppMessage("Menu Bantuan", content, settings);
     },
@@ -1378,9 +1408,272 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
             return await getUserInfoMessage(customerDeviceId, genieacsUrl, auth, getParameterWithPaths, parameterPaths, getRxPowerClass);
         }
         
+        // Perintah Mikrotik - Tambah user hotspot
+        else if (WHATSAPP_COMMANDS.ADD_HOTSPOT.includes(command)) {
+            // Hanya admin yang boleh menggunakan perintah ini
+            if (!isAdmin) {
+                return WHATSAPP_MESSAGES.ADMIN_ONLY(settings);
+            }
+            
+            // Format perintah: addhotspot username password [profile]
+            const parts = params.split(' ');
+            if (parts.length < 2) {
+                return WHATSAPP_MESSAGES.getFormattedMessage('Informasi', 'Format perintah salah. Gunakan: *addhotspot username password [profile]*', settings);
+            }
+            
+            const username = parts[0];
+            const password = parts[1];
+            const profile = parts.length > 2 ? parts[2] : 'default';
+            
+            try {
+                const result = await mikrotikHandler.addHotspotUser(username, password, profile);
+                return WHATSAPP_MESSAGES.getFormattedMessage(
+                    result.success ? 'Berhasil' : 'Gagal', 
+                    result.message, 
+                    settings
+                );
+            } catch (error) {
+                console.error('Error adding hotspot user:', error);
+                return WHATSAPP_MESSAGES.getFormattedMessage('Gagal', `Gagal menambahkan user hotspot: ${error.message || JSON.stringify(error)}`, settings);
+            }
+        }
+        
+        // Perintah Mikrotik - Hapus user hotspot
+        else if (WHATSAPP_COMMANDS.DELETE_HOTSPOT.includes(command)) {
+            // Hanya admin yang boleh menggunakan perintah ini
+            if (!isAdmin) {
+                return WHATSAPP_MESSAGES.ADMIN_ONLY(settings);
+            }
+            
+            // Format perintah: delhotspot username
+            if (!params) {
+                return WHATSAPP_MESSAGES.getFormattedMessage('Informasi', 'Format perintah salah. Gunakan: *delhotspot username*', settings);
+            }
+            
+            const username = params.trim();
+            
+            try {
+                const result = await mikrotikHandler.deleteHotspotUser(username);
+                return WHATSAPP_MESSAGES.getFormattedMessage(
+                    result.success ? 'Berhasil' : 'Gagal', 
+                    result.message, 
+                    settings
+                );
+            } catch (error) {
+                console.error('Error deleting hotspot user:', error);
+                return WHATSAPP_MESSAGES.getFormattedMessage('Gagal', `Gagal menghapus user hotspot: ${error.message || JSON.stringify(error)}`, settings);
+            }
+        }
+        
+        // Perintah Mikrotik - Tambah secret PPPoE
+        else if (WHATSAPP_COMMANDS.ADD_PPPOE.includes(command)) {
+            // Hanya admin yang boleh menggunakan perintah ini
+            if (!isAdmin) {
+                return WHATSAPP_MESSAGES.ADMIN_ONLY(settings);
+            }
+            
+            // Format perintah: addpppoe username password [profile]
+            const parts = params.split(' ');
+            if (parts.length < 2) {
+                return WHATSAPP_MESSAGES.getFormattedMessage('Informasi', 'Format perintah salah. Gunakan: *addpppoe username password [profile]*', settings);
+            }
+            
+            const username = parts[0];
+            const password = parts[1];
+            const profile = parts.length > 2 ? parts[2] : 'default';
+            
+            try {
+                const result = await mikrotikHandler.addPPPoESecret(username, password, profile);
+                return WHATSAPP_MESSAGES.getFormattedMessage(
+                    result.success ? 'Berhasil' : 'Gagal', 
+                    result.message, 
+                    settings
+                );
+            } catch (error) {
+                console.error('Error adding PPPoE secret:', error);
+                return WHATSAPP_MESSAGES.getFormattedMessage('Gagal', `Gagal menambahkan secret PPPoE: ${error.message || JSON.stringify(error)}`, settings);
+            }
+        }
+        
+        // Perintah Mikrotik - Hapus secret PPPoE
+        else if (WHATSAPP_COMMANDS.DELETE_PPPOE.includes(command)) {
+            // Hanya admin yang boleh menggunakan perintah ini
+            if (!isAdmin) {
+                return WHATSAPP_MESSAGES.ADMIN_ONLY(settings);
+            }
+            
+            // Format perintah: delpppoe username
+            if (!params) {
+                return WHATSAPP_MESSAGES.getFormattedMessage('Informasi', 'Format perintah salah. Gunakan: *delpppoe username*', settings);
+            }
+            
+            const username = params.trim();
+            
+            try {
+                const result = await mikrotikHandler.deletePPPoESecret(username);
+                return WHATSAPP_MESSAGES.getFormattedMessage(
+                    result.success ? 'Berhasil' : 'Gagal', 
+                    result.message, 
+                    settings
+                );
+            } catch (error) {
+                console.error('Error deleting PPPoE secret:', error);
+                return WHATSAPP_MESSAGES.getFormattedMessage('Gagal', `Gagal menghapus secret PPPoE: ${error.message || JSON.stringify(error)}`, settings);
+            }
+        }
+        
+        // Perintah Mikrotik - Ubah profile PPPoE
+        else if (WHATSAPP_COMMANDS.SET_PROFILE.includes(command)) {
+            // Hanya admin yang boleh menggunakan perintah ini
+            if (!isAdmin) {
+                return WHATSAPP_MESSAGES.ADMIN_ONLY(settings);
+            }
+            
+            // Format perintah: setprofile username profile
+            const parts = params.split(' ');
+            if (parts.length < 2) {
+                return WHATSAPP_MESSAGES.getFormattedMessage('Informasi', 'Format perintah salah. Gunakan: *setprofile username profile*', settings);
+            }
+            
+            const username = parts[0];
+            const profile = parts[1];
+            
+            try {
+                const result = await mikrotikHandler.setPPPoEProfile(username, profile);
+                return WHATSAPP_MESSAGES.getFormattedMessage(
+                    result.success ? 'Berhasil' : 'Gagal', 
+                    result.message, 
+                    settings
+                );
+            } catch (error) {
+                console.error('Error setting PPPoE profile:', error);
+                return WHATSAPP_MESSAGES.getFormattedMessage('Gagal', `Gagal mengubah profile PPPoE: ${error.message || JSON.stringify(error)}`, settings);
+            }
+        }
+        
+        // Perintah Mikrotik - Lihat daftar profile PPPoE
+        else if (WHATSAPP_COMMANDS.LIST_PROFILES.includes(command)) {
+            // Hanya admin yang boleh menggunakan perintah ini
+            if (!isAdmin) {
+                return WHATSAPP_MESSAGES.ADMIN_ONLY(settings);
+            }
+            
+            try {
+                const result = await mikrotikHandler.listPPPoEProfiles();
+                return WHATSAPP_MESSAGES.getFormattedMessage(
+                    'Daftar Profile PPPoE', 
+                    result.message, 
+                    settings
+                );
+            } catch (error) {
+                console.error('Error listing PPPoE profiles:', error);
+                return WHATSAPP_MESSAGES.getFormattedMessage('Gagal', `Gagal mendapatkan daftar profile PPPoE: ${error.message || JSON.stringify(error)}`, settings);
+            }
+        }
+        
+        // Perintah Mikrotik - Lihat daftar user hotspot
+        else if (WHATSAPP_COMMANDS.LIST_HOTSPOT.includes(command)) {
+            // Hanya admin yang boleh menggunakan perintah ini
+            if (!isAdmin) {
+                return WHATSAPP_MESSAGES.ADMIN_ONLY(settings);
+            }
+            
+            try {
+                const result = await mikrotikHandler.listHotspotUsers();
+                return WHATSAPP_MESSAGES.getFormattedMessage(
+                    'Daftar User Hotspot', 
+                    result.message, 
+                    settings
+                );
+            } catch (error) {
+                console.error('Error listing hotspot users:', error);
+                return WHATSAPP_MESSAGES.getFormattedMessage('Gagal', `Gagal mendapatkan daftar user hotspot: ${error.message || JSON.stringify(error)}`, settings);
+            }
+        }
+        
+        // Perintah Mikrotik - Lihat daftar secret PPPoE
+        else if (WHATSAPP_COMMANDS.LIST_PPPOE.includes(command)) {
+            // Hanya admin yang boleh menggunakan perintah ini
+            if (!isAdmin) {
+                return WHATSAPP_MESSAGES.ADMIN_ONLY(settings);
+            }
+            
+            try {
+                const result = await mikrotikHandler.listPPPoESecrets();
+                return WHATSAPP_MESSAGES.getFormattedMessage(
+                    'Daftar Secret PPPoE', 
+                    result.message, 
+                    settings
+                );
+            } catch (error) {
+                console.error('Error listing PPPoE secrets:', error);
+                return WHATSAPP_MESSAGES.getFormattedMessage('Gagal', `Gagal mendapatkan daftar secret PPPoE: ${error.message || JSON.stringify(error)}`, settings);
+            }
+        }
+        
+        // Perintah Mikrotik - Lihat daftar user PPPoE yang offline
+        else if (WHATSAPP_COMMANDS.LIST_OFFLINE_PPPOE.includes(command)) {
+            // Hanya admin yang boleh menggunakan perintah ini
+            if (!isAdmin) {
+                return WHATSAPP_MESSAGES.ADMIN_ONLY(settings);
+            }
+            
+            try {
+                const result = await mikrotikHandler.listOfflinePPPoEUsers();
+                return WHATSAPP_MESSAGES.getFormattedMessage(
+                    'Daftar User PPPoE Offline', 
+                    result.message, 
+                    settings
+                );
+            } catch (error) {
+                console.error('Error listing offline PPPoE users:', error);
+                return WHATSAPP_MESSAGES.getFormattedMessage('Gagal', `Gagal mendapatkan daftar user PPPoE offline: ${error.message || JSON.stringify(error)}`, settings);
+            }
+        }
+        
+        // Perintah Mikrotik - Lihat informasi resource router
+        else if (WHATSAPP_COMMANDS.ROUTER_RESOURCE.includes(command)) {
+            // Hanya admin yang boleh menggunakan perintah ini
+            if (!isAdmin) {
+                return WHATSAPP_MESSAGES.ADMIN_ONLY(settings);
+            }
+            
+            try {
+                const result = await mikrotikHandler.getRouterResource();
+                return WHATSAPP_MESSAGES.getFormattedMessage(
+                    'Informasi Resource Router', 
+                    result.message, 
+                    settings
+                );
+            } catch (error) {
+                console.error('Error getting router resource:', error);
+                return WHATSAPP_MESSAGES.getFormattedMessage('Gagal', `Gagal mendapatkan informasi resource router: ${error.message || JSON.stringify(error)}`, settings);
+            }
+        }
+        
+        // Perintah Mikrotik - Lihat penggunaan bandwidth
+        else if (WHATSAPP_COMMANDS.BANDWIDTH_USAGE.includes(command)) {
+            // Hanya admin yang boleh menggunakan perintah ini
+            if (!isAdmin) {
+                return WHATSAPP_MESSAGES.ADMIN_ONLY(settings);
+            }
+            
+            try {
+                const result = await mikrotikHandler.getBandwidthUsage();
+                return WHATSAPP_MESSAGES.getFormattedMessage(
+                    'Informasi Bandwidth Router', 
+                    result.message, 
+                    settings
+                );
+            } catch (error) {
+                console.error('Error getting bandwidth usage:', error);
+                return WHATSAPP_MESSAGES.getFormattedMessage('Gagal', `Gagal mendapatkan informasi bandwidth router: ${error.message || JSON.stringify(error)}`, settings);
+            }
+        }
+        
         // Perintah tidak dikenali
         else {
-            return WHATSAPP_MESSAGES.INVALID_COMMAND;
+            return WHATSAPP_MESSAGES.INVALID_COMMAND(settings);
         }
     } catch (error) {
         console.error('Error processing WhatsApp message:', error);
