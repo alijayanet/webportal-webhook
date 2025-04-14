@@ -3,10 +3,10 @@
   "otpExpiry": 300,
   "otpLength": 4,
   "whatsappGateway": "fonnte",
-  "adminWhatsapp": "6281947215703",
+  "adminWhatsapp": "",
   "gateways": {
     "fonnte": {
-      "token": "wik2cbw4NaURsKqycqL6",
+      "token": "",
       "enabled": true
     },
     "wablas": {
@@ -24,16 +24,16 @@
   "mikrotik": {
     "host": "192.168.8.1",
     "port": 8700,
-    "username": "alijayahotspot",
-    "password": "087828060111",
+    "username": "admin",
+    "password": "admin",
     "enabled": true
   },
   "otpMessage": "Kode OTP Anda untuk login WebPortal: {{otp}}. Kode ini berlaku selama {{expiry}} menit. ALIJAYA-NET",
   "server": {
-    "genieacsUrl": "http://192.168.8.89:7557",
-    "genieacsUsername": "acs",
-    "genieacsPassword": "060111",
-    "adminUsername": "alijaya",
-    "adminPassword": "060111"
+    "genieacsUrl": "http://192.168.8.xx:7557",
+    "genieacsUsername": "admin",
+    "genieacsPassword": "admin",
+    "adminUsername": "admin",
+    "adminPassword": "admin"
   }
 }
