@@ -9,4 +9,11 @@ GENIEACS_PASSWORD=admin
 # Server Configuration
 SESSION_SECRET=rahasia-session
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=admin                                                                                                                                                                                                                            
+ADMIN_PASSWORD=admin
+
+# Mikrotik Configuration
+MIKROTIK_HOST=192.168.8.1
+MIKROTIK_PORT=8728
+MIKROTIK_USERNAME=admin
+MIKROTIK_PASSWORD=admin
+                                                                
