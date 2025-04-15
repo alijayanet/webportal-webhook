@@ -7,7 +7,9 @@
   "gateways": {
     "fonnte": {
       "token": "",
-      "enabled": false
+      "serverUrl": "https://api.fonnte.com/send",
+      "sender": "",
+      "enabled": true
     },
     "wablas": {
       "token": "",
@@ -18,6 +20,7 @@
       "token": "",
       "serverUrl": "https://mpwa.id/send-message",
       "sender": "",
+      "footer": "ALIJAYA-NET",
       "enabled": false
     }
   },
@@ -30,10 +33,10 @@
   },
   "otpMessage": "Kode OTP Anda untuk login WebPortal: {{otp}}. Kode ini berlaku selama {{expiry}} menit. ALIJAYA-NET",
   "server": {
-    "genieacsUrl": "http://192.168.8.xx:7557",
-    "genieacsUsername": "admin",
-    "genieacsPassword": "admin",
-    "adminUsername": "admin",
-    "adminPassword": "admin"
+    "genieacsUrl": "http://192.168.8.89:7557",
+    "genieacsUsername": "acs",
+    "genieacsPassword": "060111",
+    "adminUsername": "alijaya",
+    "adminPassword": "060111"
   }
 }

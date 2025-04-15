@@ -206,6 +206,16 @@
                                     <input type="text" class="form-control" id="fonnte-token" value="<%= settings.gateways?.fonnte?.token || '' %>">
                                 </div>
                                 <div class="mb-3">
+                                    <label for="fonnte-server-url" class="form-label">Server URL</label>
+                                    <input type="text" class="form-control" id="fonnte-server-url" value="<%= settings.gateways?.fonnte?.serverUrl || 'https://api.fonnte.com/send' %>" placeholder="https://api.fonnte.com/send">
+                                    <div class="form-text">URL API untuk mengirim pesan (default: https://api.fonnte.com/send)</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="fonnte-sender" class="form-label">Nomor Pengirim (opsional)</label>
+                                    <input type="text" class="form-control" id="fonnte-sender" value="<%= settings.gateways?.fonnte?.sender || '' %>" placeholder="6281234567890">
+                                    <div class="form-text">Nomor pengirim jika menggunakan multi-device (kosongkan jika menggunakan device tunggal)</div>
+                                </div>
+                                <div class="mb-3">
                                     <label class="form-label">Webhook URL</label>
                                     <div class="input-group">
                                         <input type="text" class="form-control" value="<%= webhookBaseUrl %>/webhook/fonnte" id="fonnte-webhook-url" readonly>
@@ -518,6 +528,8 @@
                 const gateways = {
                     fonnte: {
                         token: $('#fonnte-token').val(),
+                        serverUrl: $('#fonnte-server-url').val(),
+                        sender: $('#fonnte-sender').val(),
                         enabled: whatsappGateway === 'fonnte'
                     },
                     wablas: {

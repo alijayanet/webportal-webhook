@@ -72,7 +72,7 @@ async function addHotspotUser(username, password, profile = 'default') {
         
         return {
             success: true,
-            message: `User hotspot ${username} berhasil ditambahkan dengan profile ${profile}`
+            message: `Username : ${username}\nPassword : ${password}\nProfile  : ${profile}`
         };
     } catch (error) {
         console.error('Error in addHotspotUser:', error);
@@ -180,7 +180,7 @@ async function addPPPoESecret(username, password, profile = 'default', localAddr
         
         return {
             success: true,
-            message: `Secret PPPoE ${username} berhasil ditambahkan dengan profile ${profile}`
+            message: `Username : ${username}\nPassword : ${password}\nProfile  : ${profile}`
         };
     } catch (error) {
         console.error('Error in addPPPoESecret:', error);
@@ -299,8 +299,8 @@ async function setPPPoEProfile(username, newProfile) {
                         console.log(`Active PPPoE session for ${username} has been terminated`);
                     }
                     
-                    // Tambahkan informasi ke pesan sukses
-                    const successMessage = `Profile PPPoE untuk ${username} berhasil diubah menjadi ${newProfile}. Sesi aktif telah dihapus, perangkat akan terhubung kembali dengan profile baru.`;
+                    // Tambahkan informasi ke pesan sukses dengan format yang lebih terstruktur
+                    const successMessage = `Username : ${username}\nProfile : ${newProfile}\n\nSesi aktif telah dihapus, perangkat akan terhubung kembali dengan profile baru.`;
                     
                     // Tutup koneksi
                     conn.close();
@@ -320,7 +320,7 @@ async function setPPPoEProfile(username, newProfile) {
             
             return {
                 success: true,
-                message: `Profile PPPoE untuk ${username} berhasil diubah menjadi ${newProfile}`
+                message: `Username : ${username}\nProfile : ${newProfile}`
             };
         } else {
             console.error(`PPPoE secret ${username} not found`);

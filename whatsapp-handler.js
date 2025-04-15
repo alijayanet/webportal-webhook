@@ -18,15 +18,17 @@ async function sendNotificationToCustomer(customerNumber, message, settings) {
         
         console.log(`Mengirim notifikasi ke pelanggan ${customerNumber}: ${message}`);
         
-        // Baca file settings.json jika settings tidak diberikan
-        if (!settings) {
-            try {
-                const settingsFile = path.join(process.cwd(), 'settings.json');
-                settings = JSON.parse(fs.readFileSync(settingsFile));
-            } catch (err) {
-                console.error('Error membaca settings.json:', err);
-                settings = {};
-            }
+        // Selalu baca file settings.json untuk mendapatkan pengaturan terbaru
+        try {
+            const settingsFile = path.join(process.cwd(), 'settings.json');
+            // Gunakan settings yang diberikan sebagai fallback jika file tidak dapat dibaca
+            const fileSettings = JSON.parse(fs.readFileSync(settingsFile));
+            settings = fileSettings || settings || {};
+            console.log('Settings berhasil dimuat ulang dari settings.json');
+        } catch (err) {
+            console.error('Error membaca settings.json:', err);
+            // Gunakan settings yang diberikan jika ada, atau objek kosong
+            settings = settings || {};
         }
         
         // Dapatkan pengaturan gateway WhatsApp
