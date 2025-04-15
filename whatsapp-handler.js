@@ -177,7 +177,7 @@ const WHATSAPP_MESSAGES = {
     },
     
     // Menu bantuan
-    HELP: function(settings) {
+    HELP: function(settings, isAdmin = false) {
         let content = "📱 *Perintah Pelanggan:*\n";
         content += "🔸 *status* - Cek status perangkat\n";
         content += "🔸 *ssid2g* [nama] - Ubah nama WiFi 2.4G\n";
@@ -185,30 +185,34 @@ const WHATSAPP_MESSAGES = {
         content += "🔸 *pass2g* [password] - Ubah password WiFi 2.4G\n";
         content += "🔸 *pass5g* [password] - Ubah password WiFi 5G\n";
         content += "🔸 *devices* - Lihat perangkat terhubung\n";
-        content += "🔸 *userinfo* - Lihat info pelanggan\n\n";
-        content += "🔴 *Khusus Admin:*\n";
-        content += "🔸 *reboot* [no_pelanggan] - Restart perangkat\n";
-        content += "🔸 *status* [no_pelanggan] - Cek status pelanggan\n";
-        content += "🔸 *userinfo* [no_pelanggan] - Lihat info pelanggan\n";
-        content += "🔸 *ssid2g* [no_pelanggan] [nama] - Ubah SSID 2.4G pelanggan\n";
-        content += "🔸 *ssid5g* [no_pelanggan] [nama] - Ubah SSID 5G pelanggan\n";
-        content += "🔸 *pass2g* [no_pelanggan] [password] - Ubah password WiFi 2.4G pelanggan\n";
-        content += "🔸 *pass5g* [no_pelanggan] [password] - Ubah password WiFi 5G pelanggan\n";
-        content += "🔸 *listdevices* - Lihat daftar semua perangkat dan nomor pelanggan\n\n";
+        content += "🔸 *userinfo* - Lihat info pelanggan\n";
         
-        content += "🔵 *Perintah Mikrotik:*\n";
-        content += "🔸 *addhotspot* [username] [password] [profile] - Tambah user hotspot\n";
-        content += "🔸 *delhotspot* [username] - Hapus user hotspot\n";
-        content += "🔸 *addpppoe* [username] [password] [profile] - Tambah secret PPPoE\n";
-        content += "🔸 *delpppoe* [username] - Hapus secret PPPoE\n";
-        content += "🔸 *setprofile* [username] [profile] - Ubah profile PPPoE\n";
-        content += "🔸 *listprofiles* - Lihat daftar profile PPPoE\n";
-        content += "🔸 *listhotspot* - Lihat daftar user hotspot yang aktif\n";
-        content += "🔸 *listpppoe* - Lihat daftar secret PPPoE\n";
-        content += "🔸 *offlinepppoe* - Lihat daftar user PPPoE yang offline\n";
-        content += "\n🔵 *Monitoring Router:*\n";
-        content += "🔸 *resource* - Lihat informasi resource router (CPU, memory, dll)\n";
-        content += "🔸 *bandwidth* - Lihat penggunaan bandwidth saat ini\n";
+        // Hanya tampilkan perintah admin dan Mikrotik jika pengguna adalah admin
+        if (isAdmin) {
+            content += "\n🔴 *Khusus Admin:*\n";
+            content += "🔸 *reboot* [no_pelanggan] - Restart perangkat\n";
+            content += "🔸 *status* [no_pelanggan] - Cek status pelanggan\n";
+            content += "🔸 *userinfo* [no_pelanggan] - Lihat info pelanggan\n";
+            content += "🔸 *ssid2g* [no_pelanggan] [nama] - Ubah SSID 2.4G pelanggan\n";
+            content += "🔸 *ssid5g* [no_pelanggan] [nama] - Ubah SSID 5G pelanggan\n";
+            content += "🔸 *pass2g* [no_pelanggan] [password] - Ubah password WiFi 2.4G pelanggan\n";
+            content += "🔸 *pass5g* [no_pelanggan] [password] - Ubah password WiFi 5G pelanggan\n";
+            content += "🔸 *listdevices* - Lihat daftar semua perangkat dan nomor pelanggan\n\n";
+            
+            content += "🔵 *Perintah Mikrotik:*\n";
+            content += "🔸 *addhotspot* [username] [password] [profile] - Tambah user hotspot\n";
+            content += "🔸 *delhotspot* [username] - Hapus user hotspot\n";
+            content += "🔸 *addpppoe* [username] [password] [profile] - Tambah secret PPPoE\n";
+            content += "🔸 *delpppoe* [username] - Hapus secret PPPoE\n";
+            content += "🔸 *setprofile* [username] [profile] - Ubah profile PPPoE\n";
+            content += "🔸 *listprofiles* - Lihat daftar profile PPPoE\n";
+            content += "🔸 *listhotspot* - Lihat daftar user hotspot yang aktif\n";
+            content += "🔸 *listpppoe* - Lihat daftar secret PPPoE\n";
+            content += "🔸 *offlinepppoe* - Lihat daftar user PPPoE yang offline\n";
+            content += "\n🔵 *Monitoring Router:*\n";
+            content += "🔸 *resource* - Lihat informasi resource router (CPU, memory, dll)\n";
+            content += "🔸 *bandwidth* - Lihat penggunaan bandwidth saat ini\n";
+        }
         
         return formatWhatsAppMessage("Menu Bantuan", content, settings);
     },
@@ -1194,7 +1198,7 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
         
         // Proses perintah
         if (WHATSAPP_COMMANDS.HELP.includes(command)) {
-            return WHATSAPP_MESSAGES.HELP(settings);
+            return WHATSAPP_MESSAGES.HELP(settings, isAdmin);
         }
         
         // Perintah status - cek status perangkat
