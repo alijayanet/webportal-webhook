@@ -92,6 +92,28 @@ async function sendNotificationToCustomer(customerNumber, message, settings) {
     }
 }
 
+// Fungsi untuk memastikan huruf kapital dan karakter khusus dipertahankan
+function preserveCase(text) {
+    // Fungsi ini mengembalikan teks asli tanpa modifikasi
+    // untuk memastikan huruf kapital dan karakter khusus dipertahankan
+    const originalText = String(text);
+    
+    // Periksa apakah teks menggunakan format khusus dengan tanda kutip
+    // Format: "Text Dengan Huruf Kapital"
+    const quotedRegex = /"([^"]+)"/g;
+    let matches = originalText.match(quotedRegex);
+    
+    if (matches && matches.length > 0) {
+        // Ambil teks di dalam tanda kutip (hapus tanda kutip)
+        let result = matches[0].slice(1, -1);
+        console.log(`preserveCase: detected quoted format, extracted='${result}', containsUppercase=${/[A-Z]/.test(result)}`);
+        return result;
+    }
+    
+    console.log(`preserveCase: input='${originalText}', containsUppercase=${/[A-Z]/.test(originalText)}`);
+    return originalText;
+}
+
 // Fungsi untuk memformat pesan WhatsApp dengan header dan footer yang menarik
 function formatWhatsAppMessage(title, content, settings) {
     // Gunakan waktu lokal Indonesia (GMT+7/WIB)
@@ -239,6 +261,8 @@ const WHATSAPP_MESSAGES = {
     },
     
     SUCCESS: function(param, value, settings) {
+        // Pastikan nilai yang ditampilkan tetap mempertahankan huruf kapital dan karakter khusus
+        // PENTING: Jangan ubah value menjadi huruf kecil atau modifikasi apapun
         const content = `✅ Berhasil mengubah ${param} menjadi: *${value}*`;
         return formatWhatsAppMessage("Berhasil", content, settings);
     },
@@ -556,23 +580,38 @@ async function updateWifiSettingViaWhatsApp(deviceId, settingType, newValue, gen
         let ssid2G, ssid5G, password2G, password5G;
         let paramName;
         
+        // Log nilai asli yang diterima (untuk debugging)
+        console.log(`Nilai asli yang diterima: '${newValue}' (tipe: ${typeof newValue})`, {
+            containsUppercase: /[A-Z]/.test(newValue),
+            containsSpecialChars: /[^a-zA-Z0-9]/.test(newValue)
+        });
+        
         // Tentukan parameter yang akan diupdate berdasarkan jenis pengaturan
+        // PENTING: Pastikan nilai tidak diubah menjadi huruf kecil
         switch (settingType) {
             case 'ssid2G':
-                ssid2G = newValue;
+                // Simpan nilai asli tanpa modifikasi
+                ssid2G = String(newValue);
                 paramName = "SSID 2.4G";
+                console.log(`Setting SSID 2.4G to: '${ssid2G}' (contains uppercase: ${/[A-Z]/.test(ssid2G)})`);
                 break;
             case 'ssid5G':
-                ssid5G = newValue;
+                // Simpan nilai asli tanpa modifikasi
+                ssid5G = String(newValue);
                 paramName = "SSID 5G";
+                console.log(`Setting SSID 5G to: '${ssid5G}' (contains uppercase: ${/[A-Z]/.test(ssid5G)})`);
                 break;
             case 'password2G':
-                password2G = newValue;
+                // Simpan nilai asli tanpa modifikasi
+                password2G = String(newValue);
                 paramName = "Password WiFi 2.4G";
+                console.log(`Setting Password 2.4G to: '${password2G}' (contains uppercase: ${/[A-Z]/.test(password2G)})`);
                 break;
             case 'password5G':
-                password5G = newValue;
+                // Simpan nilai asli tanpa modifikasi
+                password5G = String(newValue);
                 paramName = "Password WiFi 5G";
+                console.log(`Setting Password 5G to: '${password5G}' (contains uppercase: ${/[A-Z]/.test(password5G)})`);
                 break;
             default:
                 return "Jenis pengaturan tidak valid.";
@@ -699,7 +738,7 @@ async function updateWifiSettingViaWhatsApp(deviceId, settingType, newValue, gen
                 let notificationTitle = "Perubahan Pengaturan WiFi";
                 let notificationContent = `${paramName} perangkat Anda telah diubah oleh administrator.\n\n`;
                 
-                // Tambahkan detail perubahan
+                // Tambahkan detail perubahan (pertahankan huruf kapital dan karakter khusus)
                 if (ssid2G) {
                     notificationContent += `SSID 2.4G baru: *${ssid2G}*\n`;
                 }
@@ -736,7 +775,22 @@ async function updateWifiSettingViaWhatsApp(deviceId, settingType, newValue, gen
             }
         }
         
-        return WHATSAPP_MESSAGES.SUCCESS(paramName, newValue, settings);
+        // Pastikan nilai yang ditampilkan di pesan sukses tetap mempertahankan huruf kapital dan karakter khusus
+        // Log nilai yang akan ditampilkan di pesan sukses
+        console.log(`Menampilkan pesan sukses dengan nilai: '${newValue}'`, {
+            containsUppercase: /[A-Z]/.test(newValue),
+            containsSpecialChars: /[^a-zA-Z0-9]/.test(newValue)
+        });
+        
+        // PENTING: Buat pesan sukses secara langsung dengan nilai asli
+        // Gunakan nilai asli yang diterima dari parameter, tanpa modifikasi apapun
+        // Pastikan nilai tidak diubah menjadi huruf kecil di sepanjang alur pemrosesan
+        const originalValue = String(newValue);
+        console.log(`Nilai asli yang akan ditampilkan: '${originalValue}' (contains uppercase: ${/[A-Z]/.test(originalValue)})`);
+        
+        // Buat pesan sukses dengan nilai asli
+        const content = `✅ Berhasil mengubah ${paramName} menjadi: *${originalValue}*`;
+        return formatWhatsAppMessage("Berhasil", content, settings);
     } catch (error) {
         console.error('Error updating WiFi setting:', error);
         // Baca pengaturan untuk header dan footer
@@ -1191,12 +1245,16 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
         // Pisahkan perintah dan parameter (perintah dalam huruf kecil, parameter tetap asli)
         const commandLowerCase = originalMessage.toLowerCase().split(' ')[0];
         const originalParts = originalMessage.split(' ');
+        
+        // PENTING: Jangan ubah parameter menjadi huruf kecil
+        // Simpan parameter asli dengan huruf kapital dan karakter khusus
         const originalParams = originalParts.length > 1 ? originalParts.slice(1).join(' ') : '';
         
         // Untuk kompatibilitas dengan kode yang sudah ada
-        const parts = originalMessage.toLowerCase().split(' ');
+        // Hanya perintah yang diubah menjadi huruf kecil, parameter tetap asli
         const command = commandLowerCase;
-        const params = parts.slice(1).join(' ');
+        // PENTING: Gunakan parameter asli, bukan versi huruf kecil
+        const params = originalParams;
         
         // Setup GenieACS credentials
         const genieacsUrl = process.env.GENIEACS_URL;
@@ -1250,7 +1308,11 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
             if (isAdmin && originalParams.split(' ').length > 1) {
                 const customerNumber = originalParams.split(' ')[0];
                 // Gunakan parameter asli untuk mempertahankan huruf kapital dan karakter khusus
-                const newSsid = originalParams.split(' ').slice(1).join(' ');
+                // Ambil nilai asli tanpa diubah menjadi huruf kecil
+                // Pisahkan nomor pelanggan dari nilai SSID
+                // PENTING: Gunakan originalParts (bukan parts yang sudah di-lowercase)
+                const newSsid = preserveCase(originalParts.slice(2).join(' '));
+                console.log(`Admin setting SSID 2.4G with preserved case: '${newSsid}'`);
                 
                 // Cari deviceId berdasarkan nomor pelanggan
                 const customerDeviceId = await getDeviceIdByWhatsApp(customerNumber, formatWhatsAppNumber);
@@ -1266,8 +1328,13 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
                 return WHATSAPP_MESSAGES.NOT_REGISTERED(settings);
             }
             
-            // Update SSID 2.4G (gunakan originalParams untuk mempertahankan huruf kapital dan karakter khusus)
-            return await updateWifiSettingViaWhatsApp(deviceId, 'ssid2G', originalParams, genieacsUrl, auth);
+            // Update SSID 2.4G dengan mempertahankan huruf kapital dan karakter khusus
+            // PENTING: Gunakan originalParts (bukan parts yang sudah di-lowercase)
+            const ssidValueRaw = originalParts.slice(1).join(' '); // Ambil semua kecuali perintah
+            const ssidValue = preserveCase(ssidValueRaw);
+            console.log(`User setting SSID 2.4G with preserved case: '${ssidValue}'`);
+            console.log(`Original input: '${ssidValueRaw}', After preserveCase: '${ssidValue}'`);
+            return await updateWifiSettingViaWhatsApp(deviceId, 'ssid2G', ssidValue, genieacsUrl, auth);
         }
         
         // Perintah untuk mengubah SSID 5G
@@ -1280,7 +1347,11 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
             if (isAdmin && originalParams.split(' ').length > 1) {
                 const customerNumber = originalParams.split(' ')[0];
                 // Gunakan parameter asli untuk mempertahankan huruf kapital dan karakter khusus
-                const newSsid = originalParams.split(' ').slice(1).join(' ');
+                // Ambil nilai asli tanpa diubah menjadi huruf kecil
+                // Pisahkan nomor pelanggan dari nilai SSID
+                // PENTING: Gunakan originalParts (bukan parts yang sudah di-lowercase)
+                const newSsid = preserveCase(originalParts.slice(2).join(' '));
+                console.log(`Admin setting SSID 2.4G with preserved case: '${newSsid}'`);
                 
                 // Cari deviceId berdasarkan nomor pelanggan
                 const customerDeviceId = await getDeviceIdByWhatsApp(customerNumber, formatWhatsAppNumber);
@@ -1296,8 +1367,13 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
                 return WHATSAPP_MESSAGES.NOT_REGISTERED(settings);
             }
             
-            // Update SSID 5G (gunakan originalParams untuk mempertahankan huruf kapital dan karakter khusus)
-            return await updateWifiSettingViaWhatsApp(deviceId, 'ssid5G', originalParams, genieacsUrl, auth);
+            // Update SSID 5G dengan mempertahankan huruf kapital dan karakter khusus
+            // PENTING: Gunakan originalParts (bukan parts yang sudah di-lowercase)
+            const ssidValueRaw = originalParts.slice(1).join(' '); // Ambil semua kecuali perintah
+            const ssidValue = preserveCase(ssidValueRaw);
+            console.log(`User setting SSID 5G with preserved case: '${ssidValue}'`);
+            console.log(`Original input: '${ssidValueRaw}', After preserveCase: '${ssidValue}'`);
+            return await updateWifiSettingViaWhatsApp(deviceId, 'ssid5G', ssidValue, genieacsUrl, auth);
         }
         
         // Perintah untuk mengubah password WiFi 2.4G
@@ -1310,7 +1386,11 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
             if (isAdmin && originalParams.split(' ').length > 1) {
                 const customerNumber = originalParams.split(' ')[0];
                 // Gunakan parameter asli untuk mempertahankan huruf kapital dan karakter khusus
-                const newPassword = originalParams.split(' ').slice(1).join(' ');
+                // Ambil nilai asli tanpa diubah menjadi huruf kecil
+                // Pisahkan nomor pelanggan dari nilai password
+                // PENTING: Gunakan originalParts (bukan parts yang sudah di-lowercase)
+                const newPassword = preserveCase(originalParts.slice(2).join(' '));
+                console.log(`Admin setting password with preserved case: '${newPassword}'`);
                 
                 // Cari deviceId berdasarkan nomor pelanggan
                 const customerDeviceId = await getDeviceIdByWhatsApp(customerNumber, formatWhatsAppNumber);
@@ -1326,8 +1406,13 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
                 return WHATSAPP_MESSAGES.NOT_REGISTERED(settings);
             }
             
-            // Update password WiFi 2.4G (gunakan originalParams untuk mempertahankan huruf kapital dan karakter khusus)
-            return await updateWifiSettingViaWhatsApp(deviceId, 'password2G', originalParams, genieacsUrl, auth);
+            // Update Password 2.4G dengan mempertahankan huruf kapital dan karakter khusus
+            // PENTING: Gunakan originalParts (bukan parts yang sudah di-lowercase)
+            const passwordValueRaw = originalParts.slice(1).join(' '); // Ambil semua kecuali perintah
+            const passwordValue = preserveCase(passwordValueRaw);
+            console.log(`User setting Password 2.4G with preserved case: '${passwordValue}'`);
+            console.log(`Original input: '${passwordValueRaw}', After preserveCase: '${passwordValue}'`);
+            return await updateWifiSettingViaWhatsApp(deviceId, 'password2G', passwordValue, genieacsUrl, auth);
         }
         
         // Perintah untuk mengubah password WiFi 5G
@@ -1340,7 +1425,11 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
             if (isAdmin && originalParams.split(' ').length > 1) {
                 const customerNumber = originalParams.split(' ')[0];
                 // Gunakan parameter asli untuk mempertahankan huruf kapital dan karakter khusus
-                const newPassword = originalParams.split(' ').slice(1).join(' ');
+                // Ambil nilai asli tanpa diubah menjadi huruf kecil
+                // Pisahkan nomor pelanggan dari nilai password
+                // PENTING: Gunakan originalParts (bukan parts yang sudah di-lowercase)
+                const newPassword = preserveCase(originalParts.slice(2).join(' '));
+                console.log(`Admin setting password with preserved case: '${newPassword}'`);
                 
                 // Cari deviceId berdasarkan nomor pelanggan
                 const customerDeviceId = await getDeviceIdByWhatsApp(customerNumber, formatWhatsAppNumber);
@@ -1356,8 +1445,11 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
                 return WHATSAPP_MESSAGES.NOT_REGISTERED(settings);
             }
             
-            // Update password WiFi 5G (gunakan originalParams untuk mempertahankan huruf kapital dan karakter khusus)
-            return await updateWifiSettingViaWhatsApp(deviceId, 'password5G', originalParams, genieacsUrl, auth);
+            // Update password WiFi 5G dengan mempertahankan huruf kapital dan karakter khusus
+            // PENTING: Gunakan originalParts (bukan parts yang sudah di-lowercase)
+            const passwordValue = originalParts.slice(1).join(' '); // Ambil semua kecuali perintah
+            console.log(`User setting password 5G with preserved case: '${passwordValue}'`);
+            return await updateWifiSettingViaWhatsApp(deviceId, 'password5G', passwordValue, genieacsUrl, auth);
         }
         
         // Perintah untuk melihat perangkat terhubung
