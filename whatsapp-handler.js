@@ -94,10 +94,14 @@ async function sendNotificationToCustomer(customerNumber, message, settings) {
 
 // Fungsi untuk memformat pesan WhatsApp dengan header dan footer yang menarik
 function formatWhatsAppMessage(title, content, settings) {
-    // Gunakan waktu lokal Indonesia (GMT+7)
+    // Gunakan waktu lokal Indonesia (GMT+7/WIB)
     const currentDate = new Date();
-    // Tambahkan offset untuk zona waktu Indonesia (WIB: GMT+7)
-    const indonesiaTime = new Date(currentDate.getTime());
+    
+    // Mengatur zona waktu Indonesia (GMT+7/WIB) secara eksplisit
+    // Offset WIB adalah UTC+7 (7 jam * 60 menit * 60 detik * 1000 milidetik)
+    const WIB_OFFSET = 7 * 60 * 60 * 1000;
+    const utcTime = currentDate.getTime() + (currentDate.getTimezoneOffset() * 60 * 1000);
+    const indonesiaTime = new Date(utcTime + WIB_OFFSET);
     
     const formattedDate = indonesiaTime.toLocaleDateString('id-ID', {
         weekday: 'long',
@@ -106,10 +110,11 @@ function formatWhatsAppMessage(title, content, settings) {
         day: 'numeric'
     });
     
-    // Format jam dengan format 24 jam (HH:mm)
+    // Format jam dengan format 24 jam (HH.mm)
     const hours = indonesiaTime.getHours().toString().padStart(2, '0');
     const minutes = indonesiaTime.getMinutes().toString().padStart(2, '0');
-    const formattedTime = `${hours}:${minutes}`;
+    // Gunakan format dengan titik sebagai pemisah (seperti 10.44)
+    const formattedTime = `${hours}.${minutes}`;
     
     // Dapatkan nama ISP dari pesan OTP (jika ada)
     const otpMessage = settings?.otpMessage || '';
@@ -1180,9 +1185,17 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
             return WHATSAPP_MESSAGES.WELCOME(settings);
         }
         
-        // Pisahkan perintah dan parameter
-        const parts = message.trim().toLowerCase().split(' ');
-        const command = parts[0];
+        // Simpan pesan asli untuk mempertahankan huruf kapital dan karakter khusus
+        const originalMessage = message.trim();
+        
+        // Pisahkan perintah dan parameter (perintah dalam huruf kecil, parameter tetap asli)
+        const commandLowerCase = originalMessage.toLowerCase().split(' ')[0];
+        const originalParts = originalMessage.split(' ');
+        const originalParams = originalParts.length > 1 ? originalParts.slice(1).join(' ') : '';
+        
+        // Untuk kompatibilitas dengan kode yang sudah ada
+        const parts = originalMessage.toLowerCase().split(' ');
+        const command = commandLowerCase;
         const params = parts.slice(1).join(' ');
         
         // Setup GenieACS credentials
@@ -1234,9 +1247,10 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
             }
             
             // Jika admin dan format perintah: ssid2g [nomor_pelanggan] [ssid_baru]
-            if (isAdmin && params.split(' ').length > 1) {
-                const customerNumber = params.split(' ')[0];
-                const newSsid = params.split(' ').slice(1).join(' ');
+            if (isAdmin && originalParams.split(' ').length > 1) {
+                const customerNumber = originalParams.split(' ')[0];
+                // Gunakan parameter asli untuk mempertahankan huruf kapital dan karakter khusus
+                const newSsid = originalParams.split(' ').slice(1).join(' ');
                 
                 // Cari deviceId berdasarkan nomor pelanggan
                 const customerDeviceId = await getDeviceIdByWhatsApp(customerNumber, formatWhatsAppNumber);
@@ -1252,8 +1266,8 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
                 return WHATSAPP_MESSAGES.NOT_REGISTERED(settings);
             }
             
-            // Update SSID 2.4G
-            return await updateWifiSettingViaWhatsApp(deviceId, 'ssid2G', params, genieacsUrl, auth);
+            // Update SSID 2.4G (gunakan originalParams untuk mempertahankan huruf kapital dan karakter khusus)
+            return await updateWifiSettingViaWhatsApp(deviceId, 'ssid2G', originalParams, genieacsUrl, auth);
         }
         
         // Perintah untuk mengubah SSID 5G
@@ -1263,9 +1277,10 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
             }
             
             // Jika admin dan format perintah: ssid5g [nomor_pelanggan] [ssid_baru]
-            if (isAdmin && params.split(' ').length > 1) {
-                const customerNumber = params.split(' ')[0];
-                const newSsid = params.split(' ').slice(1).join(' ');
+            if (isAdmin && originalParams.split(' ').length > 1) {
+                const customerNumber = originalParams.split(' ')[0];
+                // Gunakan parameter asli untuk mempertahankan huruf kapital dan karakter khusus
+                const newSsid = originalParams.split(' ').slice(1).join(' ');
                 
                 // Cari deviceId berdasarkan nomor pelanggan
                 const customerDeviceId = await getDeviceIdByWhatsApp(customerNumber, formatWhatsAppNumber);
@@ -1281,8 +1296,8 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
                 return WHATSAPP_MESSAGES.NOT_REGISTERED(settings);
             }
             
-            // Update SSID 5G
-            return await updateWifiSettingViaWhatsApp(deviceId, 'ssid5G', params, genieacsUrl, auth);
+            // Update SSID 5G (gunakan originalParams untuk mempertahankan huruf kapital dan karakter khusus)
+            return await updateWifiSettingViaWhatsApp(deviceId, 'ssid5G', originalParams, genieacsUrl, auth);
         }
         
         // Perintah untuk mengubah password WiFi 2.4G
@@ -1292,9 +1307,10 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
             }
             
             // Jika admin dan format perintah: pass2g [nomor_pelanggan] [password_baru]
-            if (isAdmin && params.split(' ').length > 1) {
-                const customerNumber = params.split(' ')[0];
-                const newPassword = params.split(' ').slice(1).join(' ');
+            if (isAdmin && originalParams.split(' ').length > 1) {
+                const customerNumber = originalParams.split(' ')[0];
+                // Gunakan parameter asli untuk mempertahankan huruf kapital dan karakter khusus
+                const newPassword = originalParams.split(' ').slice(1).join(' ');
                 
                 // Cari deviceId berdasarkan nomor pelanggan
                 const customerDeviceId = await getDeviceIdByWhatsApp(customerNumber, formatWhatsAppNumber);
@@ -1310,8 +1326,8 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
                 return WHATSAPP_MESSAGES.NOT_REGISTERED(settings);
             }
             
-            // Update password WiFi 2.4G
-            return await updateWifiSettingViaWhatsApp(deviceId, 'password2G', params, genieacsUrl, auth);
+            // Update password WiFi 2.4G (gunakan originalParams untuk mempertahankan huruf kapital dan karakter khusus)
+            return await updateWifiSettingViaWhatsApp(deviceId, 'password2G', originalParams, genieacsUrl, auth);
         }
         
         // Perintah untuk mengubah password WiFi 5G
@@ -1321,9 +1337,10 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
             }
             
             // Jika admin dan format perintah: pass5g [nomor_pelanggan] [password_baru]
-            if (isAdmin && params.split(' ').length > 1) {
-                const customerNumber = params.split(' ')[0];
-                const newPassword = params.split(' ').slice(1).join(' ');
+            if (isAdmin && originalParams.split(' ').length > 1) {
+                const customerNumber = originalParams.split(' ')[0];
+                // Gunakan parameter asli untuk mempertahankan huruf kapital dan karakter khusus
+                const newPassword = originalParams.split(' ').slice(1).join(' ');
                 
                 // Cari deviceId berdasarkan nomor pelanggan
                 const customerDeviceId = await getDeviceIdByWhatsApp(customerNumber, formatWhatsAppNumber);
@@ -1339,8 +1356,8 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
                 return WHATSAPP_MESSAGES.NOT_REGISTERED(settings);
             }
             
-            // Update password WiFi 5G
-            return await updateWifiSettingViaWhatsApp(deviceId, 'password5G', params, genieacsUrl, auth);
+            // Update password WiFi 5G (gunakan originalParams untuk mempertahankan huruf kapital dan karakter khusus)
+            return await updateWifiSettingViaWhatsApp(deviceId, 'password5G', originalParams, genieacsUrl, auth);
         }
         
         // Perintah untuk melihat perangkat terhubung
