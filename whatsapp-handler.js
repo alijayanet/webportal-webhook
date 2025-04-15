@@ -94,17 +94,22 @@ async function sendNotificationToCustomer(customerNumber, message, settings) {
 
 // Fungsi untuk memformat pesan WhatsApp dengan header dan footer yang menarik
 function formatWhatsAppMessage(title, content, settings) {
+    // Gunakan waktu lokal Indonesia (GMT+7)
     const currentDate = new Date();
-    const formattedDate = currentDate.toLocaleDateString('id-ID', {
+    // Tambahkan offset untuk zona waktu Indonesia (WIB: GMT+7)
+    const indonesiaTime = new Date(currentDate.getTime());
+    
+    const formattedDate = indonesiaTime.toLocaleDateString('id-ID', {
         weekday: 'long',
         year: 'numeric',
         month: 'long',
         day: 'numeric'
     });
-    const formattedTime = currentDate.toLocaleTimeString('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+    
+    // Format jam dengan format 24 jam (HH:mm)
+    const hours = indonesiaTime.getHours().toString().padStart(2, '0');
+    const minutes = indonesiaTime.getMinutes().toString().padStart(2, '0');
+    const formattedTime = `${hours}:${minutes}`;
     
     // Dapatkan nama ISP dari pesan OTP (jika ada)
     const otpMessage = settings?.otpMessage || '';
