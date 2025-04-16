@@ -1141,22 +1141,51 @@ async function getUserInfoMessage(deviceId, genieacsUrl, auth, getParameterWithP
             formattedUptime = 'N/A';
         }
         
-        // Dapatkan nomor pelanggan dari tags
+        // Dapatkan nomor pelanggan dari tags sesuai dengan format yang digunakan di dashboard.ejs
         let customerNumber = 'N/A';
-        if (device._tags) {
-            // Cek jika ada tag customerNumber
-            if (device._tags.customerNumber) {
-                customerNumber = device._tags.customerNumber;
-            } else {
-                // Cek jika ada tag yang merupakan nomor telepon (minimal 5 digit)
-                for (const tag in device._tags) {
-                    if (tag.length >= 5 && /^\d+$/.test(tag)) {
-                        customerNumber = tag;
-                        break;
-                    }
+        
+        // Berdasarkan kode di dashboard.ejs dan app.js, nomor pelanggan disimpan sebagai tag numerik
+        // di dalam array device._tags
+        if (device._tags && Array.isArray(device._tags)) {
+            // Cari tag yang berupa angka (format yang digunakan di dashboard.ejs)
+            const numericTag = device._tags.find(tag => /^\d+$/.test(tag));
+            if (numericTag) {
+                customerNumber = numericTag;
+                console.log(`Nomor pelanggan ditemukan di _tags (array) sebagai tag numerik: ${customerNumber}`);
+            }
+        } 
+        // Jika _tags adalah objek (bukan array), coba cari di properti objek
+        else if (device._tags && typeof device._tags === 'object') {
+            // Cek jika ada tag yang merupakan nomor telepon (minimal 5 digit)
+            for (const tag in device._tags) {
+                if (/^\d+$/.test(tag)) {
+                    customerNumber = tag;
+                    console.log(`Nomor pelanggan ditemukan di _tags (objek) sebagai properti numerik: ${customerNumber}`);
+                    break;
                 }
             }
         }
+        
+        // Jika masih N/A, coba cek di properti customerNumber khusus
+        if (customerNumber === 'N/A') {
+            // Cek di properti customerNumber jika ada
+            if (device.customerNumber) {
+                customerNumber = device.customerNumber;
+                console.log(`Nomor pelanggan ditemukan di device.customerNumber: ${customerNumber}`);
+            } 
+            // Cek di Tags.CustomerNumber._value jika ada
+            else if (device.Tags?.CustomerNumber?._value) {
+                customerNumber = device.Tags.CustomerNumber._value;
+                console.log(`Nomor pelanggan ditemukan di Tags.CustomerNumber._value: ${customerNumber}`);
+            }
+            // Cek di VirtualParameters jika ada
+            else if (device.VirtualParameters?.CustomerNumber?._value) {
+                customerNumber = device.VirtualParameters.CustomerNumber._value;
+                console.log(`Nomor pelanggan ditemukan di VirtualParameters.CustomerNumber._value: ${customerNumber}`);
+            }
+        }
+        
+        console.log(`Hasil akhir nomor pelanggan: ${customerNumber}`);
         
         // Format konten pesan
         let content = `💻 *Informasi Perangkat*\n`;
@@ -1181,6 +1210,52 @@ async function getUserInfoMessage(deviceId, genieacsUrl, auth, getParameterWithP
         content += `Perangkat Terhubung 2.4G: ${userConnected2G}\n`;
         content += `Perangkat Terhubung 5G: ${userConnected5G}\n`;
         
+        // Tambahkan daftar perangkat terhubung jika ada
+        let connectedDevices = [];
+        
+        // Coba ambil data perangkat terhubung dari device
+        if (device.InternetGatewayDevice?.LANDevice?.['1']?.Hosts?.Host) {
+            const hosts = device.InternetGatewayDevice.LANDevice['1'].Hosts.Host;
+            
+            // Proses data host
+            for (const index in hosts) {
+                if (!isNaN(index)) { // Hanya proses indeks numerik
+                    const host = hosts[index];
+                    
+                    if (host) {
+                        const lastSeen = host.X_BROADCOM_COM_LastActive?._value || 
+                                        host.LastActive?._value || 
+                                        new Date().toISOString();
+                                        
+                        const isActive = new Date() - new Date(lastSeen) < (60 * 60 * 1000); // 1 jam
+                        
+                        connectedDevices.push({
+                            hostName: host.HostName?._value || '(tidak diketahui)',
+                            ipAddress: host.IPAddress?._value || '-',
+                            macAddress: host.MACAddress?._value || '-',
+                            interfaceType: host.InterfaceType?._value || '-',
+                            activeStatus: isActive ? 'Aktif' : 'Tidak Aktif',
+                            lastConnect: new Date(lastSeen).toLocaleString()
+                        });
+                    }
+                }
+            }
+            
+            console.log(`Berhasil memproses ${connectedDevices.length} perangkat terhubung`);
+        }
+        
+        // Tambahkan daftar perangkat terhubung jika ada
+        if (connectedDevices.length > 0) {
+            content += `\n📱 *Daftar Perangkat Terhubung*\n`;
+            
+            connectedDevices.forEach((device, index) => {
+                content += `\n${index + 1}. ${device.hostName}\n`;
+                content += `   IP: ${device.ipAddress}\n`;
+                content += `   MAC: ${device.macAddress}\n`;
+                content += `   Status: ${device.activeStatus}\n`;
+            });
+        }
+        
         // Baca pengaturan untuk header dan footer
         let settings;
         try {
@@ -1191,8 +1266,18 @@ async function getUserInfoMessage(deviceId, genieacsUrl, auth, getParameterWithP
             settings = {};
         }
         
+        // Dapatkan tanggal dan waktu saat ini untuk header pesan
+        const now = new Date();
+        const dateOptions = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+        const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
+        const dateStr = now.toLocaleDateString('id-ID', dateOptions);
+        const timeStr = now.toLocaleTimeString('id-ID', timeOptions);
+        
+        // Buat header kustom dengan tanggal dan waktu
+        const customHeader = `${settings?.companyHeader || 'ISP MONITOR'}\n${dateStr}\n${timeStr}`;
+        
         // Format pesan dengan header dan footer
-        const message = formatWhatsAppMessage('Informasi Pelanggan', content, settings);
+        const message = formatWhatsAppMessage(customHeader, content, settings);
         
         return message;
     } catch (error) {
