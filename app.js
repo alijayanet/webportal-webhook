@@ -125,18 +125,21 @@ if (!fs.existsSync(SETTINGS_FILE)) {
         gateways: {
             fonnte: {
                 token: "",
-                enabled: false
+                enabled: false,
+                serverUrl: "https://api.fonnte.com/send",
+                sender: ""
             },
             wablas: {
                 token: "",
                 enabled: false,
-                serverUrl: "https://solo.wablas.com/api"
+                serverUrl: "https://solo.wablas.com/api",
+                sender: ""
             },
             mpwa: {
                 token: "",
                 enabled: false,
                 serverUrl: "https://mpwa.id/api",
-                sender: ""    // Tambahkan sender untuk MPWA
+                sender: ""
             }
         },
         otpMessage: "Kode OTP Anda untuk login WebPortal: {{otp}}. Kode ini berlaku selama {{expiry}} menit.",
@@ -2321,18 +2324,53 @@ app.get('/logo-version', (req, res) => {
 // ===== WEBHOOK WHATSAPP =====
 
 // Endpoint webhook untuk Fonnte
+// GET endpoint untuk validasi webhook oleh Fonnte (sementara)
+app.get('/webhook/fonnte', (req, res) => {
+    res.status(200).json({ status: true, message: 'GET method for Fonnte webhook validation' });
+});
 app.post('/webhook/fonnte', async (req, res) => {
+    // DEBUG LOG: tampilkan semua request yang masuk
+    console.log('Fonnte webhook raw:', {
+        method: req.method,
+        url: req.url,
+        headers: req.headers,
+        body: req.body
+    });
     try {
         console.log('Fonnte webhook received:', req.body);
-        
-        // Validasi request dari Fonnte
-        if (!req.body || !req.body.from || !req.body.message) {
+        // Validasi request dari Fonnte (field: sender & message)
+        if (!req.body || !req.body.sender || !req.body.message) {
             return res.status(400).json({ status: false, message: 'Invalid request format' });
         }
-        
-        const sender = req.body.from;
+        // Ambil settings dan cek apakah gateway Fonnte aktif
+        let botNumber = '';
+        let fonnteEnabled = false;
+        try {
+            const settingsData = fs.readFileSync(SETTINGS_FILE, 'utf8');
+            const settings = JSON.parse(settingsData);
+            botNumber = settings.gateways?.fonnte?.sender || '';
+            fonnteEnabled = settings.gateways?.fonnte?.enabled === true;
+        } catch (e) { botNumber = ''; fonnteEnabled = false; }
+        if (!fonnteEnabled) {
+            return res.status(200).json({ status: true, message: 'Fonnte gateway disabled, ignore message' });
+        }
+        const sender = req.body.sender;
         const message = req.body.message;
-        
+        // Filter: Abaikan jika pesan dari bot sendiri atau pesan balasan sistem/brand
+        const lowerMsg = typeof message === 'string' ? message.toLowerCase() : '';
+        if (sender === botNumber && botNumber) {
+            return res.status(200).json({ status: true, message: 'Ignore outgoing message' });
+        }
+        // Proteksi anti-loop: abaikan pesan jika mengandung ciri khas balasan sistem atau brand sendiri
+        const autoReplyPatterns = [
+            'perintah tidak valid',
+            'pesan ini dikirim otomatis oleh sistem',
+            'alijaya-net',
+            'layanan pelanggan:'
+        ];
+        if (autoReplyPatterns.some(pattern => lowerMsg.includes(pattern))) {
+            return res.status(200).json({ status: true, message: 'Ignore system/brand auto-reply' });
+        }
         // Proses pesan WhatsApp
         const response = await whatsappHandler.processWhatsAppMessage(sender, message, 'fonnte', {
             formatWhatsAppNumber,
@@ -2343,10 +2381,8 @@ app.post('/webhook/fonnte', async (req, res) => {
             getRxPowerClass,
             SETTINGS_FILE
         });
-        
         // Kirim balasan
         await sendWhatsAppMessage(sender, response);
-        
         res.json({ status: true, message: 'Message processed' });
     } catch (error) {
         console.error('Error processing Fonnte webhook:', error);
@@ -2356,17 +2392,49 @@ app.post('/webhook/fonnte', async (req, res) => {
 
 // Endpoint webhook untuk Wablas
 app.post('/webhook/wablas', async (req, res) => {
+    // DEBUG LOG: tampilkan semua request yang masuk
+    console.log('Wablas webhook raw:', {
+        method: req.method,
+        url: req.url,
+        headers: req.headers,
+        body: req.body
+    });
     try {
         console.log('Wablas webhook received:', req.body);
-        
         // Validasi request dari Wablas
         if (!req.body || !req.body.data || !req.body.data.phone || !req.body.data.message) {
             return res.status(400).json({ status: false, message: 'Invalid request format' });
         }
-        
         const sender = req.body.data.phone;
         const message = req.body.data.message;
-        
+        // Ambil nomor bot dari settings
+        let botNumber = '';
+        try {
+            const settingsData = fs.readFileSync(SETTINGS_FILE, 'utf8');
+            const settings = JSON.parse(settingsData);
+            botNumber = settings.gateways?.wablas?.sender || '';
+        } catch (e) { botNumber = ''; }
+        // Filter: Abaikan jika pesan dari bot sendiri atau pesan balasan sistem/brand
+        const lowerMsg = typeof message === 'string' ? message.toLowerCase() : '';
+        if (sender === botNumber && botNumber) {
+            return res.status(200).json({ status: true, message: 'Ignore outgoing message' });
+        }
+        // Proteksi anti-loop: abaikan pesan jika mengandung ciri khas balasan sistem atau brand sendiri
+        const autoReplyPatterns = [
+            'perintah tidak valid',
+            'pesan ini dikirim otomatis oleh sistem',
+            'alijaya-net',
+            'layanan pelanggan:'
+        ];
+        if (autoReplyPatterns.some(pattern => lowerMsg.includes(pattern))) {
+            return res.status(200).json({ status: true, message: 'Ignore system/brand auto-reply' });
+        }
+        if (sender === botNumber && botNumber) {
+            return res.status(200).json({ status: true, message: 'Ignore outgoing message' });
+        }
+        if (typeof message === 'string' && message.includes('Perintah tidak valid')) {
+            return res.status(200).json({ status: true, message: 'Ignore system auto-reply' });
+        }
         // Proses pesan WhatsApp
         const response = await whatsappHandler.processWhatsAppMessage(sender, message, 'wablas', {
             formatWhatsAppNumber,
@@ -2377,10 +2445,8 @@ app.post('/webhook/wablas', async (req, res) => {
             getRxPowerClass,
             SETTINGS_FILE
         });
-        
         // Kirim balasan
         await sendWhatsAppMessage(sender, response);
-        
         res.json({ status: true, message: 'Message processed' });
     } catch (error) {
         console.error('Error processing Wablas webhook:', error);
@@ -2390,17 +2456,49 @@ app.post('/webhook/wablas', async (req, res) => {
 
 // Endpoint webhook untuk MPWA
 app.post('/webhook/mpwa', async (req, res) => {
+    // DEBUG LOG: tampilkan semua request yang masuk
+    console.log('MPWA webhook raw:', {
+        method: req.method,
+        url: req.url,
+        headers: req.headers,
+        body: req.body
+    });
     try {
         console.log('MPWA webhook received:', req.body);
-        
         // Validasi request dari MPWA
         if (!req.body || !req.body.from || !req.body.message) {
             return res.status(400).json({ status: false, message: 'Invalid request format' });
         }
-        
         const sender = req.body.from;
         const message = req.body.message;
-        
+        // Ambil nomor bot dari settings
+        let botNumber = '';
+        try {
+            const settingsData = fs.readFileSync(SETTINGS_FILE, 'utf8');
+            const settings = JSON.parse(settingsData);
+            botNumber = settings.gateways?.mpwa?.sender || '';
+        } catch (e) { botNumber = ''; }
+        // Filter: Abaikan jika pesan dari bot sendiri atau pesan balasan sistem/brand
+        const lowerMsg = typeof message === 'string' ? message.toLowerCase() : '';
+        if (sender === botNumber && botNumber) {
+            return res.status(200).json({ status: true, message: 'Ignore outgoing message' });
+        }
+        // Proteksi anti-loop: abaikan pesan jika mengandung ciri khas balasan sistem atau brand sendiri
+        const autoReplyPatterns = [
+            'perintah tidak valid',
+            'pesan ini dikirim otomatis oleh sistem',
+            'alijaya-net',
+            'layanan pelanggan:'
+        ];
+        if (autoReplyPatterns.some(pattern => lowerMsg.includes(pattern))) {
+            return res.status(200).json({ status: true, message: 'Ignore system/brand auto-reply' });
+        }
+        if (sender === botNumber && botNumber) {
+            return res.status(200).json({ status: true, message: 'Ignore outgoing message' });
+        }
+        if (typeof message === 'string' && message.includes('Perintah tidak valid')) {
+            return res.status(200).json({ status: true, message: 'Ignore system auto-reply' });
+        }
         // Proses pesan WhatsApp
         const response = await whatsappHandler.processWhatsAppMessage(sender, message, 'mpwa', {
             formatWhatsAppNumber,
@@ -2411,10 +2509,8 @@ app.post('/webhook/mpwa', async (req, res) => {
             getRxPowerClass,
             SETTINGS_FILE
         });
-        
         // Kirim balasan
         await sendWhatsAppMessage(sender, response);
-        
         res.json({ status: true, message: 'Message processed' });
     } catch (error) {
         console.error('Error processing MPWA webhook:', error);

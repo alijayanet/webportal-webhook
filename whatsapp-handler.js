@@ -152,9 +152,11 @@ function formatWhatsAppMessage(title, content, settings) {
     message += "│ " + formattedTime + "\n";
     message += "╰────────────────╯\n\n";
     
-    // Tambahkan judul pesan
-    message += "*" + title + "*\n";
-    message += "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n\n";
+    // Tambahkan judul pesan hanya jika judul tidak kosong
+    if (title && title.trim() !== '') {
+        message += "*" + title + "*\n";
+        message += "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n\n";
+    }
     
     // Tambahkan konten pesan
     message += content;
@@ -1268,13 +1270,9 @@ async function getUserInfoMessage(deviceId, genieacsUrl, auth, getParameterWithP
         
         // Dapatkan tanggal dan waktu saat ini untuk header pesan
         const now = new Date();
-        const dateOptions = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-        const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
-        const dateStr = now.toLocaleDateString('id-ID', dateOptions);
-        const timeStr = now.toLocaleTimeString('id-ID', timeOptions);
-        
-        // Buat header kustom dengan tanggal dan waktu
-        const customHeader = `${settings?.companyHeader || 'ISP MONITOR'}\n${dateStr}\n${timeStr}`;
+        // Gunakan header kosong untuk menghindari duplikasi tanggal dan waktu
+        // karena fungsi formatWhatsAppMessage sudah menambahkan header dengan tanggal dan waktu
+        const customHeader = ""; // Kosongkan header karena sudah ada di formatWhatsAppMessage
         
         // Format pesan dengan header dan footer
         const message = formatWhatsAppMessage(customHeader, content, settings);
