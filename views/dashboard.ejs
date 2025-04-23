@@ -42,37 +42,27 @@
         }
         
         .navbar {
-            background: linear-gradient(135deg, #6B73FF 0%, #000DFF 100%);
-            backdrop-filter: blur(10px);
-            box-shadow: 
-                0 5px 20px rgba(0, 0, 0, 0.1),
-                0 0 15px rgba(107, 115, 255, 0.1);
-        }
+    background: linear-gradient(90deg, #4a90e2 0%, #6a11cb 100%);
+    padding: 1rem 0;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+    border-radius: 0 0 24px 24px;
+}
         .navbar-brand {
             font-weight: 600;
             font-size: 1.25rem;
         }
         .card {
-            border: none;
-            border-radius: 20px;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            box-shadow: 
-                0 10px 30px rgba(0, 0, 0, 0.15),
-                0 0 20px rgba(107, 115, 255, 0.1),
-                0 0 0 1px rgba(255, 255, 255, 0.1),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.2);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            overflow: hidden;
-        }
-        .card:hover {
-            transform: translateY(-15px);
-            box-shadow: 
-                0 30px 60px rgba(0, 0, 0, 0.3),
-                0 0 40px rgba(107, 115, 255, 0.2),
-                0 0 0 1px rgba(255, 255, 255, 0.2),
-                inset 0 0 0 1px rgba(255, 255, 255, 0.3);
-        }
+    border: none;
+    border-radius: 18px;
+    box-shadow: 0 4px 32px 0 rgba(44, 62, 80, 0.12);
+    background: linear-gradient(120deg, #4a90e2 0%, #5f2c82 100%);
+    color: #fff;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.card:hover {
+    transform: translateY(-6px) scale(1.02);
+    box-shadow: 0 8px 40px 0 rgba(44, 62, 80, 0.18);
+}
         .card-header {
             background: transparent;
             border-bottom: 1px solid rgba(0, 0, 0, 0.05);
@@ -95,7 +85,7 @@
             box-shadow: 
                 0 15px 35px rgba(0, 0, 0, 0.3),
                 0 0 30px rgba(107, 115, 255, 0.3),
-                inset 0 0 15px rgba(255, 255, 255, 0.5);
+                inset 0 0 0 1px rgba(255, 255, 255, 0.5);
         }
         .btn {
             border-radius: 50px;
@@ -318,15 +308,16 @@
         }
         
         .dark-mode .btn-primary {
-            background: linear-gradient(135deg, #2b5876 0%, #4e4376 100%);
-            box-shadow: 0 4px 12px rgba(30, 30, 100, 0.3);
-            transition: all 0.3s ease;
+            background: linear-gradient(90deg, #4a90e2 0%, #6a11cb 100%);
+            border: none;
+            color: #fff;
+            box-shadow: 0 2px 8px rgba(76,110,245,0.18);
+            transition: background 0.2s, box-shadow 0.2s;
         }
-        
-        .dark-mode .btn-primary:hover {
-            background: linear-gradient(135deg, #4e4376 0%, #2b5876 100%);
-            box-shadow: 0 6px 15px rgba(30, 30, 100, 0.4);
-            transform: translateY(-2px);
+        .dark-mode .btn-primary:hover, .dark-mode .btn-primary:focus {
+            background: linear-gradient(90deg, #6a11cb 0%, #4a90e2 100%);
+            box-shadow: 0 4px 16px rgba(76,110,245,0.28);
+            color: #fff;
         }
         
         .dark-mode .btn-danger {
