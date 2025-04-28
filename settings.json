@@ -9,7 +9,7 @@
       "token": "",
       "serverUrl": "https://api.fonnte.com/send",
       "sender": "",
-      "enabled": false
+      "enabled": true
     },
     "wablas": {
       "token": "",
