@@ -199,6 +199,10 @@
                     <div class="card-body">
                         <form id="gatewaySettingsForm">
                             <div class="mb-3">
+                                <label class="form-label">ID Group WhatsApp (untuk notifikasi laporan gangguan)</label>
+                                <input type="text" class="form-control" id="groupWhatsapp" name="groupWhatsapp" placeholder="Contoh: 120363031495796203@g.us" value="<%= settings.groupWhatsapp || '' %>">
+                            </div>
+                            <div class="mb-3">
                                 <label class="form-label">Pilih WhatsApp Gateway</label>
                                 <div class="form-check">
                                     <input class="form-check-input gateway-radio" type="radio" name="whatsappGateway" id="fonnte" value="fonnte" <%= settings.whatsappGateway === 'fonnte' ? 'checked' : '' %>>
@@ -312,6 +316,9 @@
                                 </button>
                                 <button type="button" id="testGateway" class="btn btn-success">
                                     <i class="fas fa-paper-plane me-2"></i>Test Gateway
+                                </button>
+                                <button type="button" id="testGroup" class="btn btn-warning">
+                                    <i class="fas fa-users me-2"></i>Test Kirim ke Group
                                 </button>
                             </div>
                         </form>
@@ -487,6 +494,22 @@
         }
         
         $(document).ready(function() {
+    $('#testGroup').on('click', function() {
+        $(this).prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Testing...');
+        $.ajax({
+            url: '/admin/test-group',
+            type: 'POST',
+            success: function(response) {
+                alert(response.message || 'Pesan test berhasil dikirim ke group WhatsApp.');
+            },
+            error: function(xhr) {
+                alert('Gagal kirim pesan test ke group: ' + (xhr.responseJSON?.message || xhr.statusText));
+            },
+            complete: function() {
+                $('#testGroup').prop('disabled', false).html('<i class="fas fa-users me-2"></i>Test Kirim ke Group');
+            }
+        });
+    });
             // Toggle gateway settings visibility
             $('.gateway-radio').change(function() {
                 const selectedGateway = $('input[name="whatsappGateway"]:checked').val();
@@ -545,6 +568,7 @@
                 e.preventDefault();
                 
                 const whatsappGateway = $('input[name="whatsappGateway"]:checked').val();
+                const groupWhatsapp = $('#groupWhatsapp').val();
                 
                 // Siapkan data gateway
                 const gateways = {
@@ -575,6 +599,7 @@
                     contentType: 'application/json',
                     data: JSON.stringify({
                         whatsappGateway,
+                        groupWhatsapp,
                         gateways
                     }),
                     success: function(response) {

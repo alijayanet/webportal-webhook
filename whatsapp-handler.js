@@ -52,20 +52,21 @@ async function sendNotificationToCustomer(customerNumber, message, settings) {
             footer
         });
         
-        // Format nomor pelanggan (pastikan diawali dengan 62)
+        // Format nomor pelanggan/group untuk MPWA
         let formattedNumber = customerNumber.toString().trim();
-        
-        // Hapus karakter non-digit
-        formattedNumber = formattedNumber.replace(/\D/g, '');
-        
-        // Format nomor dengan benar
-        if (formattedNumber.startsWith('0')) {
-            formattedNumber = '62' + formattedNumber.substring(1);
-        } else if (!formattedNumber.startsWith('62')) {
-            formattedNumber = '62' + formattedNumber;
+        if (gateway === 'mpwa' && formattedNumber.includes('@g.us')) {
+            // Jika group WhatsApp, kirim apa adanya
+            console.log('Nomor tujuan terdeteksi group WhatsApp, tidak diubah:', formattedNumber);
+        } else {
+            // Untuk nomor personal, normalisasi ke format 62xxxxxxxxxx
+            formattedNumber = formattedNumber.replace(/\D/g, '');
+            if (formattedNumber.startsWith('0')) {
+                formattedNumber = '62' + formattedNumber.substring(1);
+            } else if (!formattedNumber.startsWith('62')) {
+                formattedNumber = '62' + formattedNumber;
+            }
+            console.log(`Nomor yang diformat: ${formattedNumber}`);
         }
-        
-        console.log(`Nomor yang diformat: ${formattedNumber}`);
         
         // Kirim pesan menggunakan gateway yang dikonfigurasi
         if (gateway === 'mpwa') {

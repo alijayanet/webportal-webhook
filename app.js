@@ -199,15 +199,17 @@ function generateOTP(length = 6) {
     }
     return OTP;
 }
-
 // Simpan OTP sementara (dalam praktik nyata sebaiknya gunakan database)
 const otpStore = new Map();
 
 // Fungsi untuk format nomor WhatsApp
 function formatWhatsAppNumber(number) {
+    // Jika group WhatsApp, return apa adanya
+    if (typeof number === 'string' && number.includes('@g.us')) {
+        return number.trim();
+    }
     // Hapus semua spasi dan karakter non-digit
     number = number.replace(/\D/g, '');
-    
     // Jika dimulai dengan 0, ganti dengan 62
     if (number.startsWith('0')) {
         number = '62' + number.slice(1);
@@ -220,7 +222,6 @@ function formatWhatsAppNumber(number) {
     else {
         number = '62' + number;
     }
-    
     return number;
 }
 
@@ -340,16 +341,21 @@ async function sendViaMpwa(phoneNumber, message) {
             endpoint: endpoint
         });
 
-        // Format nomor dengan benar (format 62xxx)
+        // Format nomor dengan benar
         let targetNumber = phoneNumber;
-        if (!targetNumber.startsWith('62')) {
-            if (targetNumber.startsWith('0')) {
-                targetNumber = '62' + targetNumber.substring(1);
-            } else {
-                targetNumber = '62' + targetNumber;
+        if (typeof targetNumber === 'string' && targetNumber.includes('@g.us')) {
+            // Group WhatsApp, biarkan apa adanya
+            console.log('Target group WhatsApp, tidak diubah:', targetNumber);
+        } else {
+            // Nomor personal, normalisasi ke format 62xxx
+            if (!targetNumber.startsWith('62')) {
+                if (targetNumber.startsWith('0')) {
+                    targetNumber = '62' + targetNumber.substring(1);
+                } else {
+                    targetNumber = '62' + targetNumber;
+                }
             }
         }
-        
         console.log('Format nomor MPWA:', targetNumber);
         
         try {
@@ -1149,6 +1155,7 @@ app.post('/lapor-gangguan', async (req, res) => {
         // Baca settings dan nomor admin
         const settings = JSON.parse(fs.readFileSync(SETTINGS_FILE));
         const adminNumber = settings.adminWhatsapp;
+        const groupId = settings.groupWhatsapp;
         if (!adminNumber) {
             return res.status(400).json({ success: false, message: 'Nomor admin belum diatur.' });
         }
@@ -1172,11 +1179,23 @@ app.post('/lapor-gangguan', async (req, res) => {
         if (keterangan && keterangan.trim()) pesan += `Keterangan: ${keterangan}\n`;
         pesan += `Waktu: ${waktu}`;
         // Kirim ke admin via WhatsApp
-        const result = await sendWhatsAppMessage(adminNumber, pesan);
-        if (result) {
+        // Kirim ke admin dan group jika ada
+        let resultAdmin = await sendWhatsAppMessage(adminNumber, pesan);
+        let resultGroup = true;
+        if (groupId && groupId !== '') {
+            try {
+                resultGroup = await sendWhatsAppMessage(groupId, pesan);
+            } catch (e) {
+                console.error('Gagal kirim ke group:', e);
+                resultGroup = false;
+            }
+        }
+        if (resultAdmin && resultGroup) {
             return res.json({ success: true });
-        } else {
+        } else if (!resultAdmin) {
             return res.status(500).json({ success: false, message: 'Gagal mengirim pesan ke admin.' });
+        } else {
+            return res.status(500).json({ success: false, message: 'Gagal mengirim pesan ke group WhatsApp.' });
         }
     } catch (err) {
         console.error('Laporan gangguan error:', err);
@@ -1940,6 +1959,28 @@ app.get('/admin/settings', (req, res) => {
     }
 });
 
+app.post('/admin/save-gateway-settings', async (req, res) => {
+    if (!req.session.isAdmin) {
+        return res.status(403).json({ success: false, message: 'Tidak diizinkan' });
+    }
+    try {
+        const { whatsappGateway, groupWhatsapp, gateways } = req.body;
+        if (!whatsappGateway || !gateways) {
+            return res.status(400).json({ success: false, message: 'Data tidak lengkap' });
+        }
+        // Baca pengaturan yang ada
+        const currentSettings = JSON.parse(fs.readFileSync(SETTINGS_FILE));
+        currentSettings.whatsappGateway = whatsappGateway;
+        currentSettings.groupWhatsapp = groupWhatsapp || '';
+        currentSettings.gateways = gateways;
+        fs.writeFileSync(SETTINGS_FILE, JSON.stringify(currentSettings, null, 2));
+        res.json({ success: true, message: 'Pengaturan gateway berhasil disimpan' });
+    } catch (error) {
+        console.error('Error saving gateway settings:', error);
+        res.status(500).json({ success: false, message: 'Gagal menyimpan pengaturan: ' + error.message });
+    }
+});
+
 app.post('/admin/save-otp-settings', async (req, res) => {
     if (!req.session.isAdmin) {
         return res.status(403).json({ success: false, message: 'Tidak diizinkan' });
@@ -2019,6 +2060,29 @@ app.post('/admin/save-gateway-settings', async (req, res) => {
             success: false, 
             message: 'Gagal menyimpan pengaturan: ' + error.message 
         });
+    }
+});
+
+app.post('/admin/test-group', async (req, res) => {
+    if (!req.session.isAdmin) {
+        return res.status(403).json({ success: false, message: 'Tidak diizinkan' });
+    }
+    try {
+        const settings = JSON.parse(fs.readFileSync(SETTINGS_FILE));
+        const groupId = settings.groupWhatsapp;
+        if (!groupId) {
+            return res.status(400).json({ success: false, message: 'ID group WhatsApp belum diisi di pengaturan' });
+        }
+        const testMsg = 'Ini adalah pesan test ke group WhatsApp dari WebPortal.';
+        const success = await sendWhatsAppMessage(groupId, testMsg);
+        if (success) {
+            res.json({ success: true, message: 'Test ke group berhasil' });
+        } else {
+            res.status(500).json({ success: false, message: 'Gagal mengirim pesan test ke group' });
+        }
+    } catch (error) {
+        console.error('Error testing group WhatsApp:', error);
+        res.status(500).json({ success: false, message: 'Gagal test group: ' + error.message });
     }
 });
 

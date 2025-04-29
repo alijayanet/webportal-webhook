@@ -2,14 +2,15 @@
   "otpEnabled": false,
   "otpExpiry": 300,
   "otpLength": 4,
-  "whatsappGateway": "fonnte",
-  "adminWhatsapp": "",
+  "whatsappGateway": "mpwa",
+  "adminWhatsapp": "6281947215703",
+  "groupWhatsapp": "120363031495796203@g.us",
   "gateways": {
     "fonnte": {
-      "token": "",
+      "token": "wik2cbw4NaURsKqycqL6",
       "serverUrl": "https://api.fonnte.com/send",
-      "sender": "",
-      "enabled": true
+      "sender": "6287820851413",
+      "enabled": false
     },
     "wablas": {
       "token": "",
@@ -17,11 +18,11 @@
       "enabled": false
     },
     "mpwa": {
-      "token": "",
-      "serverUrl": "https://mpwa.id/send-message",
-      "sender": "",
+      "token": "jBuKSNnho33nHn5EpgBSMrRBRqB7F4",
+      "serverUrl": "https://wa.parabolaku.id/send-message",
+      "sender": "6287820851413",
       "footer": "ALIJAYA-NET",
-      "enabled": false
+      "enabled": true
     }
   },
   "mikrotik": {
