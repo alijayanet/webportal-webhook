@@ -1142,6 +1142,48 @@ function encodeDeviceId(deviceId) {
     return encodeURIComponent(decodedId);
 }
 
+// Endpoint laporan gangguan dari pelanggan
+app.post('/lapor-gangguan', async (req, res) => {
+    try {
+        const { jenisGangguan, keterangan, nomorPelanggan, pppoeUsername, rxPower, userConnected2G, userConnected5G } = req.body;
+        // Baca settings dan nomor admin
+        const settings = JSON.parse(fs.readFileSync(SETTINGS_FILE));
+        const adminNumber = settings.adminWhatsapp;
+        if (!adminNumber) {
+            return res.status(400).json({ success: false, message: 'Nomor admin belum diatur.' });
+        }
+        // Format pesan laporan lengkap
+        // Format waktu Asia/Jakarta
+        const now = new Date();
+        const waktu = now.toLocaleString('id-ID', {
+            timeZone: 'Asia/Jakarta',
+            day: 'numeric', month: 'numeric', year: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
+        }).replace(/\./g, ':');
+
+        let pesan = `*Laporan Gangguan dari Pelanggan*\n`;
+        pesan += `Nomor Pelanggan: ${nomorPelanggan && nomorPelanggan !== '' ? nomorPelanggan : '-'}\n`;
+        pesan += `PPPoE Username: ${pppoeUsername && pppoeUsername !== '' ? pppoeUsername : '-'}\n`;
+        pesan += `Redaman (RXPower): ${rxPower && rxPower !== '' ? rxPower : '-'}\n`;
+        pesan += `User Konek SSID 2.4G: ${userConnected2G && userConnected2G !== '' ? userConnected2G : '-'}\n`;
+        pesan += `User Konek SSID 5G: ${(userConnected5G && userConnected5G !== '' && userConnected5G !== '-') ? userConnected5G : 'N/A'}\n`;
+        pesan += `Jenis Gangguan: ${jenisGangguan && jenisGangguan !== '' ? jenisGangguan : '-'}\n`;
+        if (keterangan && keterangan.trim()) pesan += `Keterangan: ${keterangan}\n`;
+        pesan += `Waktu: ${waktu}`;
+        // Kirim ke admin via WhatsApp
+        const result = await sendWhatsAppMessage(adminNumber, pesan);
+        if (result) {
+            return res.json({ success: true });
+        } else {
+            return res.status(500).json({ success: false, message: 'Gagal mengirim pesan ke admin.' });
+        }
+    } catch (err) {
+        console.error('Laporan gangguan error:', err);
+        return res.status(500).json({ success: false, message: 'Terjadi kesalahan server.' });
+    }
+});
+
 // Update SSID endpoint
 app.post('/update-wifi', async (req, res) => {
     try {
