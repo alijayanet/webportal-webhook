@@ -729,6 +729,37 @@
         </div>
     </div>
 
+    <!-- Form Laporan Gangguan -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-0">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>LAPORAN GANGGUAN</h5>
+                </div>
+                <div class="card-body">
+                    <form id="formLaporanGangguan">
+                        <div class="mb-3">
+                            <label for="jenisGangguan" class="form-label">Jenis Gangguan</label>
+                            <select class="form-select" id="jenisGangguan" name="jenisGangguan" required>
+                                <option value="">-- Pilih Gangguan --</option>
+                                <option value="ONU mati">ONU mati</option>
+                                <option value="Kabel Jaringan Putus">Kabel Jaringan Putus</option>
+                                <option value="Tidak ada Internet">Tidak ada Internet</option>
+                                <option value="Lainnya">Lainnya</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="keteranganGangguan" class="form-label">Keterangan (Opsional)</label>
+                            <textarea class="form-control" id="keteranganGangguan" name="keteranganGangguan" rows="2" placeholder="Tuliskan detail gangguan jika ada..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-danger"><i class="fas fa-paper-plane me-1"></i>Kirim Laporan</button>
+                    </form>
+                    <div id="laporanGangguanAlert" style="display:none;" class="alert mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- User Device Information Card -->
     <div class="row">
         <div class="col-12 mb-4">
@@ -857,6 +888,66 @@
                 passwordInput.type = 'password';
                 eyeIcon.classList.remove('fa-eye-slash');
                 eyeIcon.classList.add('fa-eye');
+            }
+        });
+
+        // Handler Laporan Gangguan
+        document.getElementById('formLaporanGangguan').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const jenis = document.getElementById('jenisGangguan').value;
+            const ket = document.getElementById('keteranganGangguan').value;
+            const alertBox = document.getElementById('laporanGangguanAlert');
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalBtnHtml = submitBtn.innerHTML;
+
+            // Reset alert
+            alertBox.style.display = 'none';
+            alertBox.className = 'alert mt-3';
+            alertBox.innerHTML = '';
+
+            try {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mengirim...';
+                // Kirim laporan ke backend
+                // Ambil data pelanggan dari EJS
+                const nomorPelanggan = <%- JSON.stringify(deviceData._tags ? (deviceData._tags.find(tag => /^\d+$/.test(tag)) || '') : '') %>;
+                const pppoeUsername = <%- JSON.stringify(deviceData.pppUsername || '') %>;
+                const rxPower = <%- JSON.stringify(deviceData.rxPower || '') %>;
+                const userConnected2G = <%- JSON.stringify(deviceData.userConnected2G || '') %>;
+                const userConnected5G = <%- JSON.stringify(deviceData.userConnected5G || '') %>;
+                const response = await fetch('/lapor-gangguan', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jenisGangguan: jenis,
+                        keterangan: ket,
+                        nomorPelanggan,
+                        pppoeUsername,
+                        rxPower,
+                        userConnected2G,
+                        userConnected5G
+                    })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alertBox.classList.add('alert-success');
+                    alertBox.innerHTML = '<i class="fas fa-check-circle me-2"></i>Laporan gangguan berhasil dikirim ke admin.';
+                    alertBox.style.display = 'block';
+                    this.reset();
+                    // Otomatis hilang setelah 3 detik
+                    setTimeout(() => {
+                        alertBox.style.display = 'none';
+                    }, 3000);
+                } else {
+                    throw new Error(data.message || 'Gagal mengirim laporan gangguan');
+                }
+            } catch (err) {
+                alertBox.classList.add('alert-danger');
+                alertBox.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>' + err.message;
+                alertBox.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
             }
         });
 
