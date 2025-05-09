@@ -1349,14 +1349,10 @@ app.get('/admin', async (req, res) => {
         });
 
         const devices = response.data.map(device => {
-            const activeDevices = getParameterWithPaths(device, ['VirtualParameters.activedevices']) || '0';
-            // Asumsikan setengah dari total activedevices untuk masing-masing band
-            const devicesPerBand = Math.ceil(parseInt(activeDevices) / 2);
-            
             // Cek status berdasarkan last inform time
             const isOnline = getDeviceStatus(device._lastInform);
-            
-            // Get connected devices count
+
+            // Get connected devices count (tidak dipakai untuk userConnected2G/5G)
             const connectedDevices = getParameterWithPaths(device, [
                 'InternetGatewayDevice.LANDevice.1.Hosts.HostNumberOfEntries',
                 'Device.Hosts.HostNumberOfEntries'
@@ -1375,8 +1371,9 @@ app.get('/admin', async (req, res) => {
                 ssid: getParameterWithPaths(device, parameterPaths.ssid) || '',
                 connectedDevices: connectedDevices,
                 mac: getParameterWithPaths(device, [...parameterPaths.pppMac, ...parameterPaths.pppMacWildcard]) || 'N/A',
-                userConnected2G: devicesPerBand.toString(),
-                userConnected5G: devicesPerBand.toString(),
+                // Ambil langsung dari parameter TotalAssociations sesuai band
+                userConnected2G: getParameterWithPaths(device, parameterPaths.userConnected2G) || '0',
+                userConnected5G: getParameterWithPaths(device, parameterPaths.userConnected5G) || '0',
             };
         });
 
