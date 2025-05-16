@@ -1322,7 +1322,9 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
         
         // Periksa apakah pesan kosong
         if (!message || message.trim() === '') {
-            return WHATSAPP_MESSAGES.WELCOME(settings);
+            // Abaikan pesan kosong
+            console.log('Mengabaikan pesan kosong');
+            return null;
         }
         
         // Simpan pesan asli untuk mempertahankan huruf kapital dan karakter khusus
@@ -1356,6 +1358,19 @@ async function processWhatsAppMessage(sender, message, gateway, deps) {
         // Jika bukan admin dan tidak terdaftar, tolak
         if (!deviceId && !isAdmin) {
             return WHATSAPP_MESSAGES.NOT_REGISTERED(settings);
+        }
+        
+        // Periksa apakah pesan adalah perintah yang valid
+        // Buat array dari semua perintah yang valid
+        const allValidCommands = Object.values(WHATSAPP_COMMANDS).flat();
+        
+        // Periksa apakah command ada dalam daftar perintah yang valid
+        const isValidCommand = allValidCommands.includes(command);
+        
+        // Jika bukan perintah yang valid, abaikan pesan
+        if (!isValidCommand) {
+            console.log(`Mengabaikan pesan yang bukan perintah valid: ${command}`);
+            return null;
         }
         
         // Proses perintah

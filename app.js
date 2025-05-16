@@ -2513,9 +2513,16 @@ app.post('/webhook/fonnte', async (req, res) => {
             getRxPowerClass,
             SETTINGS_FILE
         });
-        // Kirim balasan
-        await sendWhatsAppMessage(sender, response);
-        res.json({ status: true, message: 'Message processed' });
+        
+        // Kirim balasan hanya jika ada respons (perintah valid)
+        if (response) {
+            await sendWhatsAppMessage(sender, response);
+            res.json({ status: true, message: 'Message processed and response sent' });
+        } else {
+            // Jika tidak ada respons, berarti pesan diabaikan
+            console.log('Pesan diabaikan, tidak mengirim balasan');
+            res.json({ status: true, message: 'Message ignored' });
+        }
     } catch (error) {
         console.error('Error processing Fonnte webhook:', error);
         res.status(500).json({ status: false, message: 'Internal server error' });
@@ -2577,9 +2584,16 @@ app.post('/webhook/wablas', async (req, res) => {
             getRxPowerClass,
             SETTINGS_FILE
         });
-        // Kirim balasan
-        await sendWhatsAppMessage(sender, response);
-        res.json({ status: true, message: 'Message processed' });
+        
+        // Kirim balasan hanya jika ada respons (perintah valid)
+        if (response) {
+            await sendWhatsAppMessage(sender, response);
+            res.json({ status: true, message: 'Message processed and response sent' });
+        } else {
+            // Jika tidak ada respons, berarti pesan diabaikan
+            console.log('Pesan diabaikan, tidak mengirim balasan');
+            res.json({ status: true, message: 'Message ignored' });
+        }
     } catch (error) {
         console.error('Error processing Wablas webhook:', error);
         res.status(500).json({ status: false, message: 'Internal server error' });
@@ -2641,9 +2655,16 @@ app.post('/webhook/mpwa', async (req, res) => {
             getRxPowerClass,
             SETTINGS_FILE
         });
-        // Kirim balasan
-        await sendWhatsAppMessage(sender, response);
-        res.json({ status: true, message: 'Message processed' });
+        
+        // Kirim balasan hanya jika ada respons (perintah valid)
+        if (response) {
+            await sendWhatsAppMessage(sender, response);
+            res.json({ status: true, message: 'Message processed and response sent' });
+        } else {
+            // Jika tidak ada respons, berarti pesan diabaikan
+            console.log('Pesan diabaikan, tidak mengirim balasan');
+            res.json({ status: true, message: 'Message ignored' });
+        }
     } catch (error) {
         console.error('Error processing MPWA webhook:', error);
         res.status(500).json({ status: false, message: 'Internal server error' });
