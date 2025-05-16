@@ -1381,7 +1381,8 @@ app.get('/admin', async (req, res) => {
             devices,
             getRxPowerClass,
             error: null,
-            settings: JSON.parse(fs.readFileSync(SETTINGS_FILE))
+            settings: JSON.parse(fs.readFileSync(SETTINGS_FILE)),
+            userLevel: req.session.userLevel || 'admin' // Default ke admin jika tidak ada
         });
 
     } catch (error) {
@@ -1390,7 +1391,8 @@ app.get('/admin', async (req, res) => {
             devices: [],
             getRxPowerClass,
             error: 'Gagal memuat data perangkat: ' + error.message,
-            settings: {}
+            settings: {},
+            userLevel: req.session.userLevel || 'admin' // Default ke admin jika tidak ada
         });
     }
 });
@@ -1405,6 +1407,16 @@ app.post('/admin/login', async (req, res) => {
             password === process.env.ADMIN_PASSWORD) {
             
             req.session.isAdmin = true;
+            req.session.userLevel = 'admin';
+            return res.redirect('/admin');
+        }
+        
+        // Cek kredensial teknisi
+        if (username === process.env.TEKNISI_USERNAME && 
+            password === process.env.TEKNISI_PASSWORD) {
+            
+            req.session.isAdmin = true; // Tetap set isAdmin true agar bisa akses halaman admin
+            req.session.userLevel = 'teknisi';
             return res.redirect('/admin');
         }
 
