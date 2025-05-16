@@ -2288,15 +2288,24 @@ app.post('/admin/save-server-settings', async (req, res) => {
     }
 
     try {
-        const { genieacsUrl, genieacsUsername, genieacsPassword, adminUsername, adminPassword } = req.body;
+        // Ambil data dari request body
+        const genieacsUrl = req.body.genieacsUrl;
+        const genieacsUsername = req.body.genieacsUsername;
+        const genieacsPassword = req.body.genieacsPassword;
+        const adminUsername = req.body.adminUsername;
+        const adminPassword = req.body.adminPassword;
         
-        // Validasi
+        // Validasi field wajib
         if (!genieacsUrl || !genieacsUsername || !genieacsPassword || !adminUsername || !adminPassword) {
             return res.status(400).json({ 
                 success: false, 
-                message: 'Semua field harus diisi' 
+                message: 'Field GenieACS dan Admin harus diisi' 
             });
         }
+        
+        // Ambil nilai teknisi dari request body atau gunakan nilai default
+        const teknisiUsername = req.body.teknisiUsername || process.env.TEKNISI_USERNAME || 'teknisi';
+        const teknisiPassword = req.body.teknisiPassword || process.env.TEKNISI_PASSWORD || 'teknisi';
         
         console.log('Menyimpan pengaturan server baru:', {
             genieacsUrl,
@@ -2314,13 +2323,17 @@ app.post('/admin/save-server-settings', async (req, res) => {
         }
         
         // Tambahkan pengaturan server ke settings.json
-        settings.server = {
-            genieacsUrl,
-            genieacsUsername,
-            genieacsPassword,
-            adminUsername,
-            adminPassword
-        };
+        if (!settings.server) {
+            settings.server = {};
+        }
+        
+        settings.server.genieacsUrl = genieacsUrl;
+        settings.server.genieacsUsername = genieacsUsername;
+        settings.server.genieacsPassword = genieacsPassword;
+        settings.server.adminUsername = adminUsername;
+        settings.server.adminPassword = adminPassword;
+        settings.server.teknisiUsername = teknisiUsername;
+        settings.server.teknisiPassword = teknisiPassword;
         
         // Simpan kembali ke settings.json
         fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
@@ -2331,6 +2344,8 @@ app.post('/admin/save-server-settings', async (req, res) => {
         process.env.GENIEACS_PASSWORD = genieacsPassword;
         process.env.ADMIN_USERNAME = adminUsername;
         process.env.ADMIN_PASSWORD = adminPassword;
+        process.env.TEKNISI_USERNAME = teknisiUsername;
+        process.env.TEKNISI_PASSWORD = teknisiPassword;
         
         // Juga update di .env untuk kompatibilitas
         updateEnvVariable('GENIEACS_URL', genieacsUrl);
@@ -2338,6 +2353,8 @@ app.post('/admin/save-server-settings', async (req, res) => {
         updateEnvVariable('GENIEACS_PASSWORD', genieacsPassword);
         updateEnvVariable('ADMIN_USERNAME', adminUsername);
         updateEnvVariable('ADMIN_PASSWORD', adminPassword);
+        updateEnvVariable('TEKNISI_USERNAME', teknisiUsername);
+        updateEnvVariable('TEKNISI_PASSWORD', teknisiPassword);
         
         console.log('Pengaturan server berhasil diperbarui');
         

@@ -468,11 +468,13 @@
             </span>
             <div>
                 <ul class="navbar-nav flex-row">
+                    <% if (userLevel === 'admin') { %>
                     <li class="nav-item me-3">
                         <a class="nav-link" href="/admin/settings">
                             <i class="fas fa-cog me-2"></i>Pengaturan
                         </a>
                     </li>
+                    <% } %>
                     <li class="nav-item">
                         <a class="nav-link" href="/admin/logout">
                             <i class="fas fa-sign-out-alt me-2"></i>Logout

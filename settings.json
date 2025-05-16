@@ -38,6 +38,8 @@
     "genieacsUsername": "admin",
     "genieacsPassword": "admin",
     "adminUsername": "admin",
-    "adminPassword": "admin"
+    "adminPassword": "admin",
+    "teknisiUsername": "teknisi",
+    "teknisiPassword": "teknisi"
   }
 }
