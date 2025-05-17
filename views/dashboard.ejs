@@ -526,7 +526,7 @@
             <div class="col-md-4 mb-4">
                 <div class="card h-100 border-0 shadow-sm">
                     <div class="card-body text-center">
-                        <div class="status-icon mb-3" style="background-color: <%= deviceData.statusColor %>">
+                        <div class="status-icon mb-3" <% if(deviceData && deviceData.statusColor) { %>style="background-color: <%= deviceData.statusColor %>"<% } else { %>style="background-color: #4a90e2"<% } %>>
                             <i class="fas fa-signal"></i>
                         </div>
                         <h5 class="card-title mb-1"><%= deviceData.statusLabel %></h5>
@@ -594,6 +594,23 @@
                                             </div>
                                             <small class="text-muted">Nomor ini digunakan untuk login di dashboard</small>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="info-group">
+                                    <label>Nama Pelanggan</label>
+                                    <div class="value">
+                                        <% 
+                                        let customerName = 'Belum diatur';
+                                        if (deviceData._tags && Array.isArray(deviceData._tags)) {
+                                            const nameTag = deviceData._tags.find(tag => tag.startsWith('customerName:'));
+                                            if (nameTag) {
+                                                customerName = nameTag.split('customerName:')[1];
+                                            }
+                                        }
+                                        %>
+                                        <%= customerName %>
                                     </div>
                                 </div>
                             </div>
@@ -910,11 +927,11 @@
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mengirim...';
                 // Kirim laporan ke backend
                 // Ambil data pelanggan dari EJS
-                const nomorPelanggan = <%- JSON.stringify(deviceData._tags ? (deviceData._tags.find(tag => /^\d+$/.test(tag)) || '') : '') %>;
-                const pppoeUsername = <%- JSON.stringify(deviceData.pppUsername || '') %>;
-                const rxPower = <%- JSON.stringify(deviceData.rxPower || '') %>;
-                const userConnected2G = <%- JSON.stringify(deviceData.userConnected2G || '') %>;
-                const userConnected5G = <%- JSON.stringify(deviceData.userConnected5G || '') %>;
+                const nomorPelanggan = "<%= deviceData._tags ? (deviceData._tags.find ? deviceData._tags.find(tag => /^\d+$/.test(tag)) : '') || '' : '' %>";
+                const pppoeUsername = "<%= deviceData.pppUsername || '' %>";
+                const rxPower = "<%= deviceData.rxPower || '' %>";
+                const userConnected2G = "<%= deviceData.userConnected2G || '' %>";
+                const userConnected5G = "<%= deviceData.userConnected5G || '' %>";
                 const response = await fetch('/lapor-gangguan', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

@@ -658,6 +658,33 @@
                                     </div>
                                 </div>
                             </div>
+                            
+                            <!-- Form Update Customer Name -->
+                            <div class="mt-2">
+                                <div class="row g-2 align-items-center">
+                                    <div class="col">
+                                         <input type="text" class="form-control form-control-sm" 
+                                                placeholder="Customer Name" 
+                                                data-device-id="<%= device._id %>"
+                                                value="<% 
+                                                    let customerName = '';
+                                                    if (device._tags && Array.isArray(device._tags)) {
+                                                        const nameTag = device._tags.find(tag => tag.startsWith('customerName:'));
+                                                        if (nameTag) {
+                                                            customerName = nameTag.split('customerName:')[1];
+                                                        }
+                                                    }
+                                                %><%= customerName %>">
+                                    </div>
+                                    <div class="col-auto">
+                                        <button class="btn btn-primary btn-sm" 
+                                                onclick="updateCustomerName(this)"
+                                                title="Update Customer Name">
+                                            <i class="fas fa-user"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
 
                             <!-- Action Buttons -->
                             <div class="mt-2">
@@ -1080,6 +1107,55 @@
                     showAlert('success', 'Nomor pelanggan berhasil diperbarui');
                 } else {
                     throw new Error(data.message || 'Gagal mengupdate nomor pelanggan');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('danger', 'Terjadi kesalahan: ' + error.message);
+            } finally {
+                // Re-enable input dan button
+                input.disabled = false;
+                button.disabled = false;
+                button.innerHTML = originalButtonText;
+            }
+        }
+        
+        // Fungsi untuk update nama pelanggan
+        async function updateCustomerName(button) {
+            // Cari input dalam parent row yang sama
+            const row = button.closest('.row');
+            const input = row.querySelector('input[type="text"]');
+            const originalButtonText = button.innerHTML;
+            
+            try {
+                // Validasi input
+                if (!input.value) {
+                    showAlert('danger', 'Nama pelanggan tidak boleh kosong');
+                    return;
+                }
+                
+                // Disable input dan button
+                input.disabled = true;
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Menyimpan...';
+                
+                // Kirim request ke server
+                const response = await fetch('/update-customer-name', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        deviceId: input.dataset.deviceId,
+                        customerName: input.value
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert('success', 'Nama pelanggan berhasil diperbarui');
+                } else {
+                    throw new Error(data.message || 'Gagal mengupdate nama pelanggan');
                 }
             } catch (error) {
                 console.error('Error:', error);
