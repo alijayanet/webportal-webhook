@@ -670,9 +670,11 @@ const parameterPaths = {
         'InternetGatewayDevice.LANDevice.1.WLANConfiguration.5.SSID'
     ],
     userConnected: [
+        'VirtualParameters.activedevices',
         'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations'
     ],
     userConnected2G: [
+        'VirtualParameters.activedevices',
         'InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations'
     ],
     userConnected5G: [
